@@ -63,6 +63,12 @@
   .pp-val{font-variant-numeric:tabular-nums;color:var(--muted);font-size:10.5px}
   .pp-name{display:flex;align-items:center;gap:6px;min-width:0}
   .pp-name span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pp-cust{margin-top:13px;width:100%;display:flex;align-items:center;justify-content:center;gap:7px;
+    font:inherit;font-size:12px;font-weight:600;cursor:pointer;padding:8px 10px;border-radius:9px;
+    background:rgba(94,141,119,.15);border:1px solid rgba(94,141,119,.5);color:var(--accent2);
+    transition:background .12s}
+  .pp-cust:hover{background:rgba(94,141,119,.26)}
+  .pp-cust i{font-size:14px}
 
   /* ---- conflict proximity panel (top-left) ---- */
   #risk{top:16px;left:16px;width:272px;padding:13px 15px;max-height:calc(100% - 32px);overflow:auto}
@@ -404,8 +410,11 @@ function showPopup(col, lngLat){
     <div class="pp-head"><span class="pp-geo">${g.name}</span><span class="pp-cloud">${DATA.cloudLabels[col.cloud]}</span></div>
     <div class="pp-place">${g.place}</div>
     <div class="pp-tot">Total spend &nbsp;<b style="color:var(--accent2)">${fmt(col.total)}</b></div>
-    ${rows}`;
-  new maplibregl.Popup({offset:14,maxWidth:"290px"}).setLngLat(lngLat).setHTML(html).addTo(map);
+    ${rows}
+    <button class="pp-cust"><i class="ph ph-users-three"></i> See customers in ${g.name}</button>`;
+  const popup = new maplibregl.Popup({offset:14,maxWidth:"290px"}).setLngLat(lngLat).setHTML(html).addTo(map);
+  const cbtn = popup.getElement().querySelector(".pp-cust");
+  if(cbtn) cbtn.onclick = ()=>{ popup.remove(); window.omniOpenRegion && window.omniOpenRegion(g.name); };
 }
 
 function refresh(){ map.getSource("ext")?.setData(buildExtrusions()); }
@@ -799,6 +808,9 @@ if(map.isStyleLoaded()) initConflicts(); else map.on("load", initConflicts);
     const name = el.dataset.region || (el.querySelector('.nm') && el.querySelector('.nm').textContent);
     if(name) openRegion(name);
   });
+
+  // Let the spend-box popup (top script) open this same region → customers modal.
+  window.omniOpenRegion = openRegion;
 })();
 </script>
 

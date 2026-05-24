@@ -675,44 +675,55 @@
     const CORE = 0xc9c2ff, GLOW = 0x7367f0;                // bright lavender core, purple glow
     const g = new THREE.Group();
 
-    // soft outer glow tube
+    // slim rail — the path the flow follows (thin + semi-transparent so it never blobs)
+    const rail = new THREE.Mesh(
+      new THREE.TubeGeometry(curve, 90, 0.32, 12, false),
+      new THREE.MeshBasicMaterial({color:CORE, transparent:true, opacity:0.5, depthWrite:false}));
+    g.add(rail);
+
+    // soft outer glow, kept subtle
     const glow = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, 64, 1.5, 12, false),
-      new THREE.MeshBasicMaterial({color:GLOW, transparent:true, opacity:0.16,
+      new THREE.TubeGeometry(curve, 90, 1.05, 12, false),
+      new THREE.MeshBasicMaterial({color:GLOW, transparent:true, opacity:0.11,
         blending:THREE.AdditiveBlending, depthWrite:false}));
     g.add(glow);
-
-    // crisp core tube
-    const core = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, 64, 0.5, 12, false),
-      new THREE.MeshBasicMaterial({color:CORE, transparent:true, opacity:0.95, depthWrite:false}));
-    g.add(core);
 
     // arrowhead at the target, aligned to the curve's final tangent (points into the district)
     const tip = curve.getPoint(1);
     const tan = curve.getTangent(1).normalize();
     const head = new THREE.Mesh(
-      new THREE.ConeGeometry(2.4, 6.5, 20),
+      new THREE.ConeGeometry(2.0, 5.4, 24),
       new THREE.MeshBasicMaterial({color:CORE, transparent:true, opacity:0.98, depthWrite:false}));
     head.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), tan);
-    head.position.copy(tip).addScaledVector(tan, -3.25);   // shift base back so the apex sits on target
+    head.position.copy(tip).addScaledVector(tan, -2.7);    // shift base back so the apex sits on target
     g.add(head);
+    // faint halo behind the arrowhead so the landing reads
+    const headGlow = new THREE.Mesh(
+      new THREE.SphereGeometry(3.0, 16, 16),
+      new THREE.MeshBasicMaterial({color:GLOW, transparent:true, opacity:0.18,
+        blending:THREE.AdditiveBlending, depthWrite:false}));
+    headGlow.position.copy(tip);
+    g.add(headGlow);
 
     // origin node on the building being moved
     const node = new THREE.Mesh(
-      new THREE.SphereGeometry(0.85, 14, 14),
+      new THREE.SphereGeometry(0.8, 14, 14),
       new THREE.MeshBasicMaterial({color:CORE, transparent:true, opacity:0.9, depthWrite:false}));
     node.position.copy(from);
     g.add(node);
 
-    // travelling pulse — conveys direction of flow toward the target
-    const pulse = new THREE.Mesh(
-      new THREE.SphereGeometry(1.1, 14, 14),
-      new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:0.9,
-        blending:THREE.AdditiveBlending, depthWrite:false}));
-    g.add(pulse);
+    // comet — a bright lead with a tapering tail that streams toward the target
+    const TRAIL = 7, comet = [];
+    for(let i=0;i<TRAIL;i++){
+      const s = 1.25 * (1 - i/TRAIL*0.72);
+      const m = new THREE.Mesh(
+        new THREE.SphereGeometry(s, 12, 12),
+        new THREE.MeshBasicMaterial({color: i===0 ? 0xffffff : CORE, transparent:true,
+          opacity:0, blending:THREE.AdditiveBlending, depthWrite:false}));
+      g.add(m); comet.push(m);
+    }
 
-    g.userData = {glow, pulse, curve};
+    g.userData = {glow, headGlow, curve, comet};
     return g;
   }
   function setHover(mesh, clientX, clientY){
@@ -839,11 +850,18 @@
     updateCamera();
     if(beam){
       const u = beam.userData;
-      if(u.glow) u.glow.material.opacity = 0.12 + 0.10*Math.sin(now*4);
-      if(u.pulse && u.curve){
-        const ft = (now*0.5) % 1;                          // pulse travels from origin to target
-        u.pulse.position.copy(u.curve.getPoint(ft));
-        u.pulse.material.opacity = 0.25 + 0.6*Math.sin(ft*Math.PI);
+      if(u.glow) u.glow.material.opacity = 0.08 + 0.06*Math.sin(now*4);
+      if(u.headGlow) u.headGlow.material.opacity = 0.14 + 0.08*Math.sin(now*5);
+      if(u.comet && u.curve){
+        const head = (now*0.42) % 1;                       // lead position, looping origin→target
+        for(let i=0;i<u.comet.length;i++){
+          const m = u.comet[i], t = head - i*0.03;
+          if(t < 0){ m.visible = false; continue; }
+          m.visible = true;
+          m.position.copy(u.curve.getPoint(t));
+          const edge = Math.min(t*5, (1-t)*5 + 0.25, 1);   // soft fade-in at origin, fade-out at target
+          m.material.opacity = Math.max(0, edge * (0.92 - i*0.12));
+        }
       }
     }
     projectLabels();
