@@ -122,9 +122,14 @@
   .resrow .rsv{text-align:right;color:var(--pink-bright);font-variant-numeric:tabular-nums}
   .btn{font:inherit;font-size:13px;font-weight:600;border-radius:10px;cursor:pointer;padding:10px 16px;
     border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--ink);transition:filter .15s}
-  .btn:hover{filter:brightness(1.18)} .btn:disabled{opacity:.5;cursor:default;filter:none}
+  .btn:hover{filter:brightness(1.18)} .btn:disabled{cursor:default;filter:none}
   .btn.primary{background:linear-gradient(90deg,var(--teal),var(--pink));color:#14151a;border:0}
   .btn.send{background:var(--pink);color:#201912;border:0}
+  /* disabled gradient buttons turn muddy at .5 opacity — render a clean flat state instead */
+  .btn:disabled,.btn.primary:disabled,.btn.send:disabled{
+    background:rgba(255,255,255,.045);color:var(--dim);border:1px solid var(--line);
+    opacity:1;display:inline-flex;align-items:center;gap:7px}
+  .btn:disabled i{font-size:15px;opacity:.8}
   .emailbox{margin-top:6px;display:none} .emailbox.show{display:block}
   .emailbox label{display:block;font-size:10px;color:var(--dim);text-transform:uppercase;
     letter-spacing:.5px;margin:10px 0 4px}
@@ -487,7 +492,8 @@
     try {
       const d = await api('/api/draft', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({customer_id: current.id})
+        // send the whole object so the backend needs no data files (works on Vercel)
+        body: JSON.stringify({customer: current})
       });
       $('cm-subject').value = d.subject || '';
       $('cm-body').value = d.body || '';
@@ -507,7 +513,7 @@
     try {
       const r = await api('/api/send', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({customer_id: current.id,
+        body: JSON.stringify({customer: current,
           subject: $('cm-subject').value, body: $('cm-body').value})
       });
       if(r.status === 'sent'){

@@ -50,6 +50,26 @@ Then open http://127.0.0.1:8000/ and switch between Grid, Map, and Customers.
 
 The map and customers panels call the backend, so use the server rather than opening the HTML files from disk. Without any API keys the app still runs: email drafting falls back to a template, sending becomes a dry run, and the conflict overlay simply pauses if GDELT is unreachable.
 
+## Deploy to Vercel
+
+Vercel has no always-on server, but it *does* run serverless functions — so the email feature works in production without a long-lived backend. The deploy is a hybrid:
+
+- **Static CDN** serves the HTML, JSON, and SVG (see `vercel.json`). The conflict overlay reads the baked `conflicts.json` snapshot, and the customer roster is inlined in `customers.html`, so the Grid, Map, and Customers views render with zero backend.
+- **One Python function** (`api/index.py`, which re-exports the FastAPI app from `server.py`) handles only `/api/config`, `/api/draft`, and `/api/send`. Drafting (Featherless) and sending (Resend) run server-side, so the API keys never touch the browser. `/api/conflicts` is deliberately *not* routed to the function, so the map keeps using the snapshot.
+
+The frontend sends the full customer object on draft/send, so the function is stateless — it reads no data files.
+
+```bash
+# bake a fresh conflict snapshot first so the map isn't stale
+uv run --python 3.12 build_conflicts.py
+
+# then deploy (or just push to a Vercel-connected Git repo)
+vercel            # preview
+vercel --prod     # production
+```
+
+Set the same variables from `.env.example` as **Project → Settings → Environment Variables** in Vercel (`RESEND_API_KEY`, `MAIL_TO`, `MAIL_FROM`, `FEATHERLESS_API_KEY`, `FEATHERLESS_MODEL`). With no keys set, the live deploy still drafts via the template and reports sends as dry-run. Note: a live LLM draft must finish inside the serverless time limit (generous on Pro/Fluid, ~10s on Hobby) — the template fallback is instant.
+
 ## Rebuilding the data
 
 The views read precomputed JSON blobs. Regenerate them from the parquet datasets when needed:

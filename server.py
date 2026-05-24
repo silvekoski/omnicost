@@ -198,13 +198,28 @@ async def featherless_draft(cust: dict) -> dict:
 # ============================ ROUTES ============================
 
 class DraftReq(BaseModel):
-    customer_id: str
+    # Either pass the full customer object (how the static/Vercel frontend calls it —
+    # keeps the serverless function from needing customers.json on disk) or just an id
+    # (the server then looks it up locally). One of the two is required.
+    customer: dict | None = None
+    customer_id: str | None = None
 
 
 class SendReq(BaseModel):
-    customer_id: str
+    customer: dict | None = None
+    customer_id: str | None = None
     subject: str
     body: str
+
+
+def resolve_customer(req) -> dict:
+    """Prefer the client-supplied object (stateless, works with no data files);
+    fall back to looking the id up in customers.json (local server)."""
+    if req.customer:
+        return req.customer
+    if req.customer_id:
+        return find_customer(req.customer_id)
+    raise HTTPException(422, "provide either 'customer' or 'customer_id'")
 
 
 @app.get("/api/config")
@@ -244,9 +259,9 @@ async def conflicts(hours: int = gdelt_conflicts.DEFAULT_HOURS,
 
 @app.post("/api/draft")
 async def draft(req: DraftReq):
-    cust = find_customer(req.customer_id)
+    cust = resolve_customer(req)
     out = template_draft(cust) if not FEATHERLESS_KEY else await featherless_draft(cust)
-    out["customer_id"] = cust["id"]
+    out["customer_id"] = cust.get("id")
     return out
 
 
@@ -266,7 +281,7 @@ def body_to_html(cust: dict, body: str) -> str:
 
 @app.post("/api/send")
 def send(req: SendReq):
-    cust = find_customer(req.customer_id)
+    cust = resolve_customer(req)
     html = body_to_html(cust, req.body)
     if not RESEND_KEY:
         return JSONResponse({
