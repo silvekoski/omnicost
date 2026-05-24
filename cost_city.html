@@ -948,17 +948,25 @@
     return r.json();
   }
 
-  async function boot(){
-    try {
-      CFG = await api('/api/config');
-      CUSTOMERS = (await api('/api/customers')).customers || [];
-    } catch(e){
-      console.info('Customers backend not reachable — panel hidden (static mode).');
-      return;                                  // stay invisible; dashboard unaffected
+  // Roster for the click-a-building popup. Prefer the live API; on a static host
+  // (e.g. Vercel, where /api/customers isn't served) fall back to the co-located
+  // customers.json so click-to-customers still works. Mirrors customers.html.
+  async function loadCustomers(){
+    try { return (await api('/api/customers')).customers || []; }
+    catch(e){
+      try { return (await api('customers.json')).customers || []; }
+      catch(e2){ return []; }
     }
-    if(!CUSTOMERS.length) return;
-    // Customers panel removed — customer data stays loaded for the
-    // click-a-building popup and the email modal.
+  }
+
+  async function boot(){
+    try { CFG = await api('/api/config'); } catch(e){ CFG = null; }
+    CUSTOMERS = await loadCustomers();
+    if(!CUSTOMERS.length){
+      console.info('No customer data reachable — click-to-customers disabled (static mode).');
+      return;
+    }
+    // customer data stays loaded for the click-a-building popup and the email modal.
   }
 
 
