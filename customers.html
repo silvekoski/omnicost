@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Omnicost · Customers</title>
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" />
+<link href="https://unpkg.com/maplibre-gl@^5/dist/maplibre-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/maplibre-gl@^5/dist/maplibre-gl.js"></script><style>
+  :root{
+    --bg:#17181c; --panel:#1f2127; --line:rgba(255,255,255,.10);
+    --ink:#e8e7e3; --dim:#8c8a84; --teal:#7ba78f; --accent:#5e8d77;
+    --pink:#c87f59; --pink-bright:#d4905f; --mint:#84b89c; --amber:#d4a35a;
+    --font:Helvetica,"Helvetica Neue",Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(--font);
+    -webkit-font-smoothing:antialiased}
+  body{display:flex;flex-direction:column;overflow:hidden}
+
+  /* ---- top bar ---- */
+  .top{flex:0 0 auto;padding:16px 22px 12px;border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,#14151a,rgba(20,21,26,.7))}
+  .top h1{margin:0;font-size:18px;font-weight:700;letter-spacing:.2px;
+    display:flex;align-items:center;gap:9px}
+  .top h1 i{color:var(--accent)}
+  .top .sub{font-size:12px;color:var(--dim);margin-top:3px}
+  .top .sub .live{color:var(--mint);font-weight:600}
+  .top .sub .dry{color:var(--amber);font-weight:600}
+
+  .agg{display:flex;gap:26px;margin:13px 0 4px;flex-wrap:wrap}
+  .agg .k{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.6px}
+  .agg .v{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:1px}
+  .agg .v.pink{color:var(--pink-bright)}
+  .agg .v.teal{color:var(--teal)}
+
+  .controls{display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap}
+  .search{flex:1 1 240px;max-width:360px;position:relative}
+  .search i{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--dim);font-size:14px}
+  .search input{width:100%;background:#131419;border:1px solid var(--line);border-radius:10px;
+    color:var(--ink);font:inherit;font-size:13px;padding:9px 12px 9px 32px;outline:none}
+  .search input:focus{border-color:rgba(123,167,143,.5)}
+  .sortsel{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--dim)}
+  .sortsel select{background:#131419;border:1px solid var(--line);border-radius:9px;color:var(--ink);
+    font:inherit;font-size:12.5px;padding:8px 10px;cursor:pointer;outline:none}
+
+  /* ---- grid of customer cards ---- */
+  .grid{flex:1 1 auto;overflow-y:auto;padding:18px 22px 28px;
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px;align-content:start}
+  .ccard{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:15px 16px;
+    cursor:pointer;transition:transform .14s ease,border-color .14s ease,box-shadow .14s ease;
+    display:flex;flex-direction:column;gap:10px}
+  .ccard:hover{transform:translateY(-3px);border-color:rgba(123,167,143,.35);
+    box-shadow:0 12px 34px rgba(0,0,0,.4)}
+  .ccard .chead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+  .ccard .co{font-size:15px;font-weight:650;line-height:1.25}
+  .ccard .ind{font-size:11.5px;color:var(--dim);margin-top:2px}
+  .badge{flex:0 0 auto;font-size:12px;font-weight:700;color:#201912;background:var(--pink);
+    border-radius:999px;padding:4px 9px;white-space:nowrap;box-shadow:0 0 12px rgba(200,127,89,.35)}
+  .badge.flat{background:rgba(255,255,255,.08);color:var(--dim);box-shadow:none}
+  .route{font-size:12.5px;color:var(--ink);display:flex;align-items:center;gap:6px}
+  .route b{color:var(--pink-bright);font-weight:600}
+  .route .arrow{color:var(--dim)}
+  .mini{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;border-top:1px solid var(--line);
+    padding-top:10px}
+  .mini .k{font-size:9.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+  .mini .v{font-size:13.5px;font-weight:650;margin-top:1px;font-variant-numeric:tabular-nums}
+  .mini .v.teal{color:var(--teal)} .mini .v.pink{color:var(--pink-bright)}
+  .ccard .contact{font-size:11.5px;color:var(--dim);display:flex;align-items:center;gap:6px}
+  .chips{display:flex;flex-wrap:wrap;gap:5px}
+  .chip{font-size:10.5px;color:var(--dim);background:rgba(255,255,255,.05);border:1px solid var(--line);
+    border-radius:999px;padding:3px 8px;cursor:pointer;transition:all .12s;white-space:nowrap}
+  .chip:hover{color:#14151a;background:var(--accent);border-color:var(--accent);
+    box-shadow:0 0 10px rgba(123,167,143,.4)}
+  .chip:active{transform:scale(.94)}
+
+  /* ---- empty / loading state ---- */
+  .empty{grid-column:1/-1;text-align:center;color:var(--dim);padding:60px 20px;font-size:13.5px;
+    line-height:1.7}
+  .empty code{background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:6px;
+    padding:2px 7px;color:var(--ink);font-size:12.5px}
+
+  /* ---- modal (matches the in-grid Customers modal) ---- */
+  .modal{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;
+    padding:24px;background:rgba(10,10,13,.66);backdrop-filter:blur(4px)}
+  .modal.open{display:flex}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;width:min(680px,100%);
+    max-height:90vh;overflow-y:auto;box-shadow:0 24px 70px rgba(0,0,0,.6);padding:22px 24px}
+  .card .x{float:right;cursor:pointer;color:var(--dim);font-size:20px;line-height:1;border:0;
+    background:none;padding:2px 6px}
+  .card .x:hover{color:var(--ink)}
+  .card h2{margin:0;font-size:18px;font-weight:650}
+  .card .meta{font-size:12px;color:var(--dim);margin:3px 0 14px}
+  .statgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+  .stat{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+  .stat .k{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+  .stat .v{font-size:15px;font-weight:650;margin-top:2px;font-variant-numeric:tabular-nums}
+  .stat .v.move b{color:var(--pink-bright)} .stat .v.disc{color:var(--pink-bright)}
+  .stat .v.ok{color:var(--mint);font-size:13.5px}
+  .reslist{border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:16px}
+  .reshead,.resrow{display:grid;grid-template-columns:2fr 1.2fr .7fr .8fr;gap:8px;padding:6px 11px;font-size:11.5px}
+  .reshead{color:var(--dim);text-transform:uppercase;letter-spacing:.4px;font-size:10px;
+    background:rgba(255,255,255,.03);border-bottom:1px solid var(--line)}
+  .resrow{border-bottom:1px dashed rgba(255,255,255,.06)}
+  .resrow:last-child{border-bottom:0}
+  .resrow .rsp{text-align:right;color:var(--teal);font-variant-numeric:tabular-nums}
+  .resrow .rsv{text-align:right;color:var(--pink-bright);font-variant-numeric:tabular-nums}
+  .btn{font:inherit;font-size:13px;font-weight:600;border-radius:10px;cursor:pointer;padding:10px 16px;
+    border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--ink);transition:filter .15s}
+  .btn:hover{filter:brightness(1.18)} .btn:disabled{opacity:.5;cursor:default;filter:none}
+  .btn.primary{background:linear-gradient(90deg,var(--teal),var(--pink));color:#14151a;border:0}
+  .btn.send{background:var(--pink);color:#201912;border:0}
+  .emailbox{margin-top:6px;display:none} .emailbox.show{display:block}
+  .emailbox label{display:block;font-size:10px;color:var(--dim);text-transform:uppercase;
+    letter-spacing:.5px;margin:10px 0 4px}
+  .emailbox input,.emailbox textarea{width:100%;background:#131419;color:var(--ink);
+    border:1px solid var(--line);border-radius:9px;padding:9px 11px;font:inherit;font-size:13px;
+    line-height:1.55;resize:vertical}
+  .emailbox textarea{min-height:200px}
+  .modelnote{font-size:10.5px;color:var(--dim);margin-top:5px}
+  .actions{display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap}
+  .status{font-size:12px;margin-left:2px}
+  .status.ok{color:var(--mint)} .status.warn{color:var(--amber)} .status.err{color:#d98b6b}
+  .spin{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.25);
+    border-top-color:#f4f3f0;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ---- footprint mini-map (lights up the hovered customer's regions) ---- */
+  .minimap{position:fixed;right:18px;bottom:18px;width:344px;z-index:20;background:var(--panel);
+    border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 14px 42px rgba(0,0,0,.55)}
+  .minimap .mm-head{display:flex;align-items:center;gap:8px;padding:9px 13px;border-bottom:1px solid var(--line)}
+  .minimap .mm-head i{color:var(--accent);font-size:15px}
+  .minimap .mm-head .t{font-size:12.5px;font-weight:650;line-height:1.2;
+    max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .minimap .mm-head .s{font-size:10.5px;color:var(--dim);margin-left:auto;white-space:nowrap}
+  #mmap{height:214px;width:100%;background:#131419}
+  .mm-pin{border-radius:50%;background:radial-gradient(circle at 38% 32%,#cfe0d6,var(--teal));
+    box-shadow:0 0 0 2px rgba(255,255,255,.55),0 0 16px rgba(123,167,143,.85);cursor:default}
+  .maplibregl-ctrl-attrib{display:none}
+</style>
+</head>
+<body>
+  <div class="top">
+    <h1><i class="ph ph-users-three"></i> Customers</h1>
+    <div class="sub" id="sub">Loading roster…</div>
+    <div class="agg" id="agg"></div>
+    <div class="controls">
+      <div class="search"><i class="ph ph-magnifying-glass"></i>
+        <input id="q" type="text" placeholder="Search company, contact, industry…" /></div>
+      <div class="sortsel"><span>Sort</span>
+        <select id="sort">
+          <option value="spend">Monthly spend</option>
+          <option value="avoidable">Avoidable spend</option>
+          <option value="discount">Discount offer</option>
+          <option value="company">Company A–Z</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid" id="grid">
+    <div class="empty">Loading…</div>
+  </div>
+
+  <!-- Hover a customer card to light up where they run -->
+  <div class="minimap" id="minimap">
+    <div class="mm-head"><i class="ph ph-map-pin"></i>
+      <div class="t" id="mm-title">Hover a customer</div>
+      <div class="s" id="mm-sub">to map their footprint</div>
+    </div>
+    <div id="mmap"></div>
+  </div>
+
+  <!-- Customer detail + AI outreach modal (same flow as the grid view) -->
+  <div class="modal" id="cust-modal">
+    <div class="card">
+      <button class="x" id="cust-close" aria-label="Close"><i class="ph ph-x"></i></button>
+      <h2 id="cm-company">—</h2>
+      <div class="meta" id="cm-meta">—</div>
+      <div class="statgrid" id="cm-stats"></div>
+      <div class="reslist" id="cm-res"></div>
+      <button class="btn primary" id="cm-draft"><i class="ph ph-sparkle"></i> Draft email with AI</button>
+      <div class="emailbox" id="cm-email">
+        <label for="cm-subject">Subject</label>
+        <input id="cm-subject" type="text" />
+        <label for="cm-body">Body</label>
+        <textarea id="cm-body"></textarea>
+        <div class="modelnote" id="cm-model"></div>
+        <div class="actions">
+          <button class="btn send" id="cm-send">Send</button>
+          <span class="status" id="cm-status"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Roster inlined at build time (build_customers.py) so the page works with no backend. -->
+  <script id="customers-data" type="application/json">/* CUSTOMERS_DATA_START */{"generated_from":"cells_multi.json (priced cost cells) \u2014 parquets untouched","note":"Relative synthetic spend units (not USD). Customers/contacts are fictional.","currency_unit":"u","count":14,"customers":[{"id":"northwind-analytics","company":"Northwind Analytics","contact":"Priya Raman","industry":"B2B analytics SaaS","email":"priya@northwindanalytics.example","current_cloud":"cloud_b","current_cloud_label":"Cloud B","target_cloud":"cloud_b","target_cloud_label":"Cloud B","discount_pct":0,"resource_count":19,"monthly_spend":72964,"avoidable_spend":0,"resources":[{"service":"analytics","service_label":"ClickHouse analytics","geo":"eu-west","geo_label":"EU West","sku":"storage-block-ssd","cloud":"cloud_b","cloud_label":"Cloud B","units":1,"monthly_spend":1,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null},{"service":"analytics","service_label":"ClickHouse analytics","geo":"apac","geo_label":"APAC","sku":"compute-cpu-optimized","cloud":"cloud_b","cloud_label":"Cloud B","units":1,"monthly_spend":4267,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null},{"service":"database-relational","service_label":"PostgreSQL / MySQL","geo":"us-west","geo_label":"US West","sku":"compute-cpu-optimized","cloud":"cloud_b","cloud_label":"Cloud B","units":14,"monthly_spend":56017,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null},{"service":"analytics","service_label":"ClickHouse analytics","geo":"eu-west","geo_label":"EU West","sku":"compute-cpu-optimized","cloud":"cloud_b","cloud_label":"Cloud B","units":3,"monthly_spend":12679,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null}]},{"id":"helsinki-robotics","company":"Helsinki Robotics","contact":"Aleksi Korhonen","industry":"Industrial IoT","email":"aleksi@helsinkirobotics.example","current_cloud":"cloud_d","current_cloud_label":"Cloud D","target_cloud":"cloud_b","target_cloud_label":"Cloud B","discount_pct":45,"resource_count":6,"monthly_spend":12716,"avoidable_spend":6727,"resources":[{"service":"streaming","service_label":"Kafka streaming","geo":"us-east","geo_label":"US East","sku":"network-lb","cloud":"cloud_d","cloud_label":"Cloud D","units":1,"monthly_spend":3769,"savings_ratio":0.5333,"target_cloud":"cloud_b","target_cloud_label":"Cloud B"},{"service":"streaming","service_label":"Kafka streaming","geo":"apac","geo_label":"APAC","sku":"other","cloud":"cloud_d","cloud_label":"Cloud D","units":1,"monthly_spend":1629,"savings_ratio":0.6,"target_cloud":"cloud_c","target_cloud_label":"Cloud C"},{"service":"observability","service_label":"Metrics & logs","geo":"apac","geo_label":"APAC","sku":"network-public-ip","cloud":"cloud_d","cloud_label":"Cloud D","units":1,"monthly_spend":1163,"savings_ratio":0.3156,"target_cloud":"cloud_b","target_cloud_label":"Cloud B"},{"service":"streaming","service_label":"Kafka streaming","geo":"eu-west","geo_label":"EU West","sku":"network-lb","cloud":"cloud_d","cloud_label":"Cloud D","units":2,"monthly_spend":6127,"savings_ratio":0.5505,"target_cloud":"cloud_b","target_cloud_label":"Cloud B"},{"service":"observability","service_label":"Metrics & logs","geo":"eu-north","geo_label":"EU North","sku":"egress-internet","cloud":"cloud_d","cloud_label":"Cloud D","units":1,"monthly_spend":28,"savings_ratio":0.0,"target_cloud":"cloud_c","target_cloud_label":"Cloud C"}]},{"id":"meridian-fintech","company":"Meridian Fintech","contact":"Sofia Alvarez","industry":"Payments platform","email":"sofia@meridianfintech.example","current_cloud":"cloud_c","current_cloud_label":"Cloud C","target_cloud":"cloud_d","target_cloud_label":"Cloud D","discount_pct":45,"resource_count":13,"monthly_spend":42002,"avoidable_spend":25183,"resources":[{"service":"database-relational","service_label":"PostgreSQL / MySQL","geo":"apac","geo_label":"APAC","sku":"storage-block-ssd","cloud":"cloud_c","cloud_label":"Cloud C","units":1,"monthly_spend":6,"savings_ratio":0.6,"target_cloud":"cloud_b","target_cloud_label":"Cloud B"},{"service":"database-relational","service_label":"PostgreSQL / MySQL","geo":"eu-north","geo_label":"EU North","sku":"compute-general","cloud":"cloud_c","cloud_label":"Cloud C","units":10,"monthly_spend":41908,"savings_ratio":0.6,"target_cloud":"cloud_d","target_cloud_label":"Cloud D"},{"service":"database-relational","service_label":"PostgreSQL / MySQL","geo":"eu-west","geo_label":"EU West","sku":"egress-cross-region","cloud":"cloud_c","cloud_label":"Cloud C","units":1,"monthly_spend":83,"savings_ratio":0.3855,"target_cloud":"cloud_d","target_cloud_label":"Cloud D"},{"service":"database-nosql","service_label":"Cassandra / Valkey","geo":"eu-west","geo_label":"EU West","sku":"storage-block-ssd","cloud":"cloud_c","cloud_label":"Cloud C","units":1,"monthly_spend":5,"savings_ratio":0.6,"target_cloud":"cloud_b","target_cloud_label":"Cloud B"}]},{"id":"aurora-media-group","company":"Aurora Media Group","contact":"Tom Becker","industry":"Streaming media","email":"tom@auroramediagroup.example","current_cloud":"cloud_b","current_cloud_label":"Cloud B","target_cloud":"cloud_b","target_cloud_label":"Cloud B","discount_pct":0,"resource_count":103,"monthly_spend":402663,"avoidable_spend":0,"resources":[{"service":"search","service_label":"OpenSearch","geo":"us-east","geo_label":"US East","sku":"compute-cpu-optimized","cloud":"cloud_b","cloud_label":"Cloud B","units":19,"monthly_spend":76024,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null},{"service":"search","service_label":"OpenSearch","geo":"eu-west","geo_label":"EU West","sku":"network-public-ip","cloud":"cloud_b","cloud_label":"Cloud B","units":24,"monthly_spend":94736,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null},{"service":"streaming","service_label":"Kafka streaming","geo":"us-east","geo_label":"US East","sku":"network-public-ip","cloud":"cloud_b","cloud_label":"Cloud B","units":15,"monthly_spend":58570,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null},{"service":"streaming","service_label":"Kafka streaming","geo":"other","geo_label":"Multi-region","sku":"storage-block-ssd","cloud":"cloud_b","cloud_label":"Cloud B","units":1,"monthly_spend":6,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null},{"service":"search","service_label":"OpenSearch","geo":"apac","geo_label":"APAC","sku":"compute-cpu-optimized","cloud":"cloud_b","cloud_label":"Cloud B","units":24,"monthly_spend":94354,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null},{"service":"streaming","service_label":"Kafka streaming","geo":"eu-north","geo_label":"EU North","sku":"compute-cpu-optimized","cloud":"cloud_b","cloud_label":"Cloud B","units":20,"monthly_spend":78973,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null}]},{"id":"pacific-logistics","company":"Pacific Logistics","contact":"Mei Lin","industry":"Freight & logistics","email":"mei@pacificlogistics.example","current_cloud":"cloud_d","current_cloud_label":"Cloud D","target_cloud":"cloud_b","target_cloud_label":"Cloud B","discount_pct":45,"resource_count":29,"monthly_spend":109096,"avoidable_spend":65388,"resources":[{"service":"analytics","service_label":"ClickHouse analytics","geo":"us-east","geo_label":"US East","sku":"egress-internet","cloud":"cloud_d","cloud_label":"Cloud D","units":1,"monthly_spend":22,"savings_ratio":0.0,"target_cloud":"cloud_c","target_cloud_label":"Cloud C"},{"service":"database-relational","service_label":"PostgreSQL / MySQL","geo":"us-west","geo_label":"US West","sku":"other","cloud":"cloud_d","cloud_label":"Cloud D","units":7,"monthly_spend":27034,"savings_ratio":0.6,"target_cloud":"cloud_b","target_cloud_label":"Cloud B"},{"service":"database-relational","service_label":"PostgreSQL / MySQL","geo":"us-west","geo_label":"US West","sku":"network-lb","cloud":"cloud_d","cloud_label":"Cloud D","units":1,"monthly_spend":536,"savings_ratio":0.4944,"target_cloud":"cloud_b","target_cloud_label":"Cloud B"},{"service":"database-relational","service_label":"PostgreSQL / MySQL","geo":"apac","geo_label":"APAC","sku":"compute-cpu-optimized","cloud":"cloud_d","cloud_label":"Cloud D","units":20,"monthly_spend":81504,"savings_ratio":0.6,"target_cloud":"cloud_b","target_cloud_label":"Cloud B"}]},{"id":"lighthouse-health","company":"Lighthouse Health","contact":"Dr. Omar Said","industry":"Digital health","email":"dr.@lighthousehealth.example","current_cloud":"cloud_c","current_cloud_label":"Cloud C","target_cloud":"cloud_d","target_cloud_label":"Cloud D","discount_pct":25,"resource_count":4,"monthly_spend":706,"avoidable_spend":175,"resources":[{"service":"database-relational","service_label":"PostgreSQL / MySQL","geo":"eu-west","geo_label":"EU West","sku":"storage-block-ssd","cloud":"cloud_c","cloud_label":"Cloud C","units":1,"monthly_spend":83,"savings_ratio":0.6,"target_cloud":"cloud_b","target_cloud_label":"Cloud B"},{"service":"database-relational","service_label":"PostgreSQL / MySQL","geo":"apac","geo_label":"APAC","sku":"egress-cross-region","cloud":"cloud_c","cloud_label":"Cloud C","units":1,"monthly_spend":3,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null},{"service":"database-relational","service_label":"PostgreSQL / MySQL","geo":"apac","geo_label":"APAC","sku":"egress-internet","cloud":"cloud_c","cloud_label":"Cloud C","units":1,"monthly_spend":302,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null},{"service":"observability","service_label":"Metrics & logs","geo":"apac","geo_label":"APAC","sku":"compute-general","cloud":"cloud_c","cloud_label":"Cloud C","units":1,"monthly_spend":318,"savings_ratio":0.3931,"target_cloud":"cloud_d","target_cloud_label":"Cloud D"}]},{"id":"vertex-gaming","company":"Vertex Gaming","contact":"Jonas Vik","industry":"Mobile gaming","email":"jonas@vertexgaming.example","current_cloud":"cloud_b","current_cloud_label":"Cloud B","target_cloud":"cloud_b","target_cloud_label":"Cloud B","discount_pct":0,"resource_count":45,"monthly_spend":174627,"avoidable_spend":0,"resources":[{"service":"streaming","service_label":"Kafka streaming","geo":"other","geo_label":"Multi-region","sku":"storage-block-ssd","cloud":"cloud_b","cloud_label":"Cloud B","units":1,"monthly_spend":6,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null},{"service":"database-nosql","service_label":"Cassandra / Valkey","geo":"other","geo_label":"Multi-region","sku":"compute-cpu-optimized","cloud":"cloud_b","cloud_label":"Cloud B","units":20,"monthly_spend":79226,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null},{"service":"streaming","service_label":"Kafka streaming","geo":"us-west","geo_label":"US West","sku":"network-public-ip","cloud":"cloud_b","cloud_label":"Cloud B","units":3,"monthly_spend":11873,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null},{"service":"streaming","service_label":"Kafka streaming","geo":"us-west","geo_label":"US West","sku":"compute-cpu-optimized","cloud":"cloud_b","cloud_label":"Cloud B","units":2,"monthly_spend":8328,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null},{"service":"streaming","service_label":"Kafka streaming","geo":"eu-north","geo_label":"EU North","sku":"network-public-ip","cloud":"cloud_b","cloud_label":"Cloud B","units":19,"monthly_spend":75194,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null}]},{"id":"cedar-retail-cloud","company":"Cedar Retail Cloud","contact":"Hanna M\u00e4kel\u00e4","industry":"E-commerce platform","email":"hanna@cedarretailcloud.example","current_cloud":"cloud_d","current_cloud_label":"Cloud D","target_cloud":"cloud_b","target_cloud_label":"Cloud B","discount_pct":31,"resource_count":47,"monthly_spend":184856,"avoidable_spend":56994,"resources":[{"service":"database-relational","service_label":"PostgreSQL / MySQL","geo":"other","geo_label":"Multi-region","sku":"other","cloud":"cloud_d","cloud_label":"Cloud D","units":2,"monthly_spend":8068,"savings_ratio":0.6,"target_cloud":"cloud_b","target_cloud_label":"Cloud B"},{"service":"database-relational","service_label":"PostgreSQL / MySQL","geo":"eu-north","geo_label":"EU North","sku":"network-public-ip","cloud":"cloud_d","cloud_label":"Cloud D","units":19,"monthly_spend":75638,"savings_ratio":0.2753,"target_cloud":"cloud_b","target_cloud_label":"Cloud B"},{"service":"database-relational","service_label":"PostgreSQL / MySQL","geo":"us-west","geo_label":"US West","sku":"network-lb","cloud":"cloud_d","cloud_label":"Cloud D","units":1,"monthly_spend":536,"savings_ratio":0.4944,"target_cloud":"cloud_b","target_cloud_label":"Cloud B"},{"service":"database-relational","service_label":"PostgreSQL / MySQL","geo":"eu-west","geo_label":"EU West","sku":"network-public-ip","cloud":"cloud_d","cloud_label":"Cloud D","units":25,"monthly_spend":100614,"savings_ratio":0.3087,"target_cloud":"cloud_b","target_cloud_label":"Cloud B"}]},{"id":"quantum-insights","company":"Quantum Insights","contact":"Ravi Deshpande","industry":"ML feature store","email":"ravi@quantuminsights.example","current_cloud":"cloud_c","current_cloud_label":"Cloud C","target_cloud":"cloud_d","target_cloud_label":"Cloud D","discount_pct":13,"resource_count":8,"monthly_spend":14517,"avoidable_spend":1934,"resources":[{"service":"database-nosql","service_label":"Cassandra / Valkey","geo":"eu-west","geo_label":"EU West","sku":"egress-intra-region","cloud":"cloud_c","cloud_label":"Cloud C","units":3,"monthly_spend":12397,"savings_ratio":0.0923,"target_cloud":"cloud_d","target_cloud_label":"Cloud D"},{"service":"database-nosql","service_label":"Cassandra / Valkey","geo":"eu-west","geo_label":"EU West","sku":"storage-block-ssd","cloud":"cloud_c","cloud_label":"Cloud C","units":1,"monthly_spend":5,"savings_ratio":0.6,"target_cloud":"cloud_b","target_cloud_label":"Cloud B"},{"service":"analytics","service_label":"ClickHouse analytics","geo":"us-west","geo_label":"US West","sku":"network-public-ip","cloud":"cloud_c","cloud_label":"Cloud C","units":1,"monthly_spend":21,"savings_ratio":0.3333,"target_cloud":"cloud_b","target_cloud_label":"Cloud B"},{"service":"analytics","service_label":"ClickHouse analytics","geo":"apac","geo_label":"APAC","sku":"network-public-ip","cloud":"cloud_c","cloud_label":"Cloud C","units":1,"monthly_spend":541,"savings_ratio":0.3087,"target_cloud":"cloud_b","target_cloud_label":"Cloud B"},{"service":"analytics","service_label":"ClickHouse analytics","geo":"apac","geo_label":"APAC","sku":"compute-general","cloud":"cloud_c","cloud_label":"Cloud C","units":1,"monthly_spend":17,"savings_ratio":0.4118,"target_cloud":"cloud_d","target_cloud_label":"Cloud D"},{"service":"database-nosql","service_label":"Cassandra / Valkey","geo":"apac","geo_label":"APAC","sku":"compute-general","cloud":"cloud_c","cloud_label":"Cloud C","units":1,"monthly_spend":1536,"savings_ratio":0.3945,"target_cloud":"cloud_d","target_cloud_label":"Cloud D"}]},{"id":"baltic-telecom","company":"Baltic Telecom","contact":"Liis Tamm","industry":"Telco / 5G","email":"liis@baltictelecom.example","current_cloud":"cloud_b","current_cloud_label":"Cloud B","target_cloud":"cloud_b","target_cloud_label":"Cloud B","discount_pct":0,"resource_count":55,"monthly_spend":213195,"avoidable_spend":0,"resources":[{"service":"observability","service_label":"Metrics & logs","geo":"us-east","geo_label":"US East","sku":"compute-cpu-optimized","cloud":"cloud_b","cloud_label":"Cloud B","units":2,"monthly_spend":6042,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null},{"service":"streaming","service_label":"Kafka streaming","geo":"other","geo_label":"Multi-region","sku":"network-public-ip","cloud":"cloud_b","cloud_label":"Cloud B","units":31,"monthly_spend":122530,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null},{"service":"observability","service_label":"Metrics & logs","geo":"other","geo_label":"Multi-region","sku":"compute-cpu-optimized","cloud":"cloud_b","cloud_label":"Cloud B","units":1,"monthly_spend":4559,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null},{"service":"streaming","service_label":"Kafka streaming","geo":"eu-north","geo_label":"EU North","sku":"network-public-ip","cloud":"cloud_b","cloud_label":"Cloud B","units":19,"monthly_spend":75194,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null},{"service":"observability","service_label":"Metrics & logs","geo":"us-east","geo_label":"US East","sku":"network-public-ip","cloud":"cloud_b","cloud_label":"Cloud B","units":1,"monthly_spend":3639,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null},{"service":"observability","service_label":"Metrics & logs","geo":"apac","geo_label":"APAC","sku":"network-public-ip","cloud":"cloud_b","cloud_label":"Cloud B","units":1,"monthly_spend":1231,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null}]},{"id":"solaris-energy","company":"Solaris Energy","contact":"Carlos Mendez","industry":"Smart-grid utility","email":"carlos@solarisenergy.example","current_cloud":"cloud_d","current_cloud_label":"Cloud D","target_cloud":"cloud_b","target_cloud_label":"Cloud B","discount_pct":8,"resource_count":9,"monthly_spend":20431,"avoidable_spend":897,"resources":[{"service":"analytics","service_label":"ClickHouse analytics","geo":"eu-west","geo_label":"EU West","sku":"egress-intra-region","cloud":"cloud_d","cloud_label":"Cloud D","units":1,"monthly_spend":2060,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null},{"service":"analytics","service_label":"ClickHouse analytics","geo":"apac","geo_label":"APAC","sku":"network-public-ip","cloud":"cloud_d","cloud_label":"Cloud D","units":1,"monthly_spend":1762,"savings_ratio":0.3138,"target_cloud":"cloud_b","target_cloud_label":"Cloud B"},{"service":"streaming","service_label":"Kafka streaming","geo":"apac","geo_label":"APAC","sku":"compute-general","cloud":"cloud_d","cloud_label":"Cloud D","units":4,"monthly_spend":15909,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null},{"service":"streaming","service_label":"Kafka streaming","geo":"eu-north","geo_label":"EU North","sku":"network-lb","cloud":"cloud_d","cloud_label":"Cloud D","units":1,"monthly_spend":432,"savings_ratio":0.463,"target_cloud":"cloud_b","target_cloud_label":"Cloud B"},{"service":"analytics","service_label":"ClickHouse analytics","geo":"eu-west","geo_label":"EU West","sku":"network-lb","cloud":"cloud_d","cloud_label":"Cloud D","units":1,"monthly_spend":256,"savings_ratio":0.5508,"target_cloud":"cloud_b","target_cloud_label":"Cloud B"},{"service":"analytics","service_label":"ClickHouse analytics","geo":"other","geo_label":"Multi-region","sku":"egress-internet","cloud":"cloud_d","cloud_label":"Cloud D","units":1,"monthly_spend":12,"savings_ratio":0.25,"target_cloud":"cloud_c","target_cloud_label":"Cloud C"}]},{"id":"atlas-travel","company":"Atlas Travel","contact":"Yuki Tanaka","industry":"Travel booking","email":"yuki@atlastravel.example","current_cloud":"cloud_c","current_cloud_label":"Cloud C","target_cloud":"cloud_b","target_cloud_label":"Cloud B","discount_pct":45,"resource_count":79,"monthly_spend":309638,"avoidable_spend":180512,"resources":[{"service":"database-relational","service_label":"PostgreSQL / MySQL","geo":"apac","geo_label":"APAC","sku":"other","cloud":"cloud_c","cloud_label":"Cloud C","units":1,"monthly_spend":755,"savings_ratio":0.6,"target_cloud":"cloud_b","target_cloud_label":"Cloud B"},{"service":"search","service_label":"OpenSearch","geo":"other","geo_label":"Multi-region","sku":"egress-internet","cloud":"cloud_c","cloud_label":"Cloud C","units":2,"monthly_spend":8669,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null},{"service":"search","service_label":"OpenSearch","geo":"us-west","geo_label":"US West","sku":"network-public-ip","cloud":"cloud_c","cloud_label":"Cloud C","units":1,"monthly_spend":244,"savings_ratio":0.3156,"target_cloud":"cloud_b","target_cloud_label":"Cloud B"},{"service":"database-relational","service_label":"PostgreSQL / MySQL","geo":"other","geo_label":"Multi-region","sku":"other","cloud":"cloud_c","cloud_label":"Cloud C","units":75,"monthly_spend":299970,"savings_ratio":0.6,"target_cloud":"cloud_b","target_cloud_label":"Cloud B"}]},{"id":"granite-security","company":"Granite Security","contact":"Erik Johansson","industry":"Cyber SIEM","email":"erik@granitesecurity.example","current_cloud":"cloud_b","current_cloud_label":"Cloud B","target_cloud":"cloud_b","target_cloud_label":"Cloud B","discount_pct":0,"resource_count":159,"monthly_spend":632465,"avoidable_spend":0,"resources":[{"service":"search","service_label":"OpenSearch","geo":"apac","geo_label":"APAC","sku":"compute-cpu-optimized","cloud":"cloud_b","cloud_label":"Cloud B","units":24,"monthly_spend":94354,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null},{"service":"observability","service_label":"Metrics & logs","geo":"eu-west","geo_label":"EU West","sku":"network-public-ip","cloud":"cloud_b","cloud_label":"Cloud B","units":2,"monthly_spend":9996,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null},{"service":"search","service_label":"OpenSearch","geo":"eu-west","geo_label":"EU West","sku":"compute-cpu-optimized","cloud":"cloud_b","cloud_label":"Cloud B","units":131,"monthly_spend":522073,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null},{"service":"observability","service_label":"Metrics & logs","geo":"us-east","geo_label":"US East","sku":"compute-cpu-optimized","cloud":"cloud_b","cloud_label":"Cloud B","units":2,"monthly_spend":6042,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null}]},{"id":"riverstone-edu","company":"Riverstone Edu","contact":"Amara Okafor","industry":"EdTech platform","email":"amara@riverstoneedu.example","current_cloud":"cloud_d","current_cloud_label":"Cloud D","target_cloud":"cloud_b","target_cloud_label":"Cloud B","discount_pct":44,"resource_count":7,"monthly_spend":20350,"avoidable_spend":8941,"resources":[{"service":"database-relational","service_label":"PostgreSQL / MySQL","geo":"eu-north","geo_label":"EU North","sku":"egress-cross-region","cloud":"cloud_d","cloud_label":"Cloud D","units":1,"monthly_spend":4730,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null},{"service":"database-nosql","service_label":"Cassandra / Valkey","geo":"us-west","geo_label":"US West","sku":"egress-internet","cloud":"cloud_d","cloud_label":"Cloud D","units":1,"monthly_spend":4,"savings_ratio":0.0,"target_cloud":null,"target_cloud_label":null},{"service":"database-relational","service_label":"PostgreSQL / MySQL","geo":"eu-west","geo_label":"EU West","sku":"other","cloud":"cloud_d","cloud_label":"Cloud D","units":4,"monthly_spend":14755,"savings_ratio":0.6,"target_cloud":"cloud_b","target_cloud_label":"Cloud B"},{"service":"database-nosql","service_label":"Cassandra / Valkey","geo":"apac","geo_label":"APAC","sku":"egress-intra-region","cloud":"cloud_d","cloud_label":"Cloud D","units":1,"monthly_spend":861,"savings_ratio":0.1022,"target_cloud":"cloud_c","target_cloud_label":"Cloud C"}]}]}/* CUSTOMERS_DATA_END */</script>
+
+<script>
+(function(){
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const fmt = n => n>=1e6 ? (n/1e6).toFixed(2)+'M' : n>=1e3 ? (n/1e3).toFixed(0)+'K' : ''+(n||0);
+  const esc = s => String(s).replace(/[&<>"]/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+  let CFG = null, CUSTOMERS = [], current = null;
+
+  // ---------- footprint mini-map: show a customer's regions on hover ----------
+  const MM_KEY = "i8lJsOawA4GXGnYwJmLL";          // same MapTiler key as the Map view
+  const GEO = {                                    // geo-bucket anchors (lat/lon)
+    'us-east': {name:'US East',  lat:39.5, lon:-80.5},
+    'us-west': {name:'US West',  lat:43.8, lon:-116.5},
+    'eu-west': {name:'EU West',  lat:48.9, lon:2.4},
+    'eu-north':{name:'EU North', lat:62.3, lon:26.5},
+    'apac':    {name:'APAC',     lat:3.8,  lon:101.8},
+    'other':   {name:'Other',    lat:22.0, lon:-40.0},
+  };
+  const MM_HOME = {center:[8,32], zoom:0.55};
+  let mmap = null, mmMarkers = [], hoverTimer = null;
+
+  function initMiniMap(){
+    if(mmap || typeof maplibregl === 'undefined') return;
+    try {
+      mmap = new maplibregl.Map({
+        container:'mmap', attributionControl:false, dragRotate:false,
+        style:`https://api.maptiler.com/maps/dataviz-dark/style.json?key=${MM_KEY}`,
+        center:MM_HOME.center, zoom:MM_HOME.zoom,
+      });
+      mmap.on('error', ()=>{});                    // swallow tile errors (static/offline)
+      window.addEventListener('resize', ()=>{ try{ mmap.resize(); }catch(e){} });
+    } catch(e){ console.warn('mini-map unavailable', e); mmap = null; }
+  }
+  function clearPins(){ mmMarkers.forEach(m=>m.remove()); mmMarkers = []; }
+  function resetFootprint(){
+    clearPins();
+    $('mm-title').textContent = 'Hover a customer';
+    $('mm-sub').textContent = 'to map their footprint';
+    if(mmap){ try{ mmap.flyTo({...MM_HOME, duration:500}); }catch(e){} }
+  }
+  function customerGeos(c){              // [ [geoKey, spend], ... ] biggest first
+    const byGeo = {};
+    for(const r of c.resources){ if(GEO[r.geo]) byGeo[r.geo] = (byGeo[r.geo]||0) + (r.monthly_spend||0); }
+    return Object.entries(byGeo).sort((a,b)=>b[1]-a[1]);
+  }
+  function showFootprint(c){
+    if(!c) return;
+    const entries = customerGeos(c);
+    $('mm-title').textContent = c.company;
+    $('mm-sub').textContent = entries.length ? entries.length+' region'+(entries.length>1?'s':'') : 'no mapped regions';
+    if(!mmap) return;
+    clearPins();
+    const maxV = Math.max(1, ...entries.map(([g,v])=>v));
+    const pts = [];
+    for(const [g,v] of entries){
+      const gg = GEO[g], sz = Math.round(13 + 26*Math.sqrt(v/maxV));
+      const el = document.createElement('div');
+      el.className = 'mm-pin'; el.style.width = el.style.height = sz+'px';
+      el.title = `${gg.name} · ${fmt(v)} u`;
+      mmMarkers.push(new maplibregl.Marker({element:el}).setLngLat([gg.lon, gg.lat]).addTo(mmap));
+      pts.push([gg.lon, gg.lat]);
+    }
+    try {
+      if(pts.length === 1) mmap.flyTo({center:pts[0], zoom:3, duration:550});
+      else if(pts.length > 1){
+        const b = new maplibregl.LngLatBounds();
+        pts.forEach(p=>b.extend(p));
+        mmap.fitBounds(b, {padding:46, duration:550, maxZoom:4.2});
+      }
+    } catch(e){}
+  }
+  // Click a region chip on a card -> zoom the mini-map to just that region.
+  function focusRegion(c, geoKey){
+    const gg = GEO[geoKey];
+    if(!gg || !c) return;
+    const hit = customerGeos(c).find(([g])=>g===geoKey);
+    const v = hit ? hit[1] : 0;
+    $('mm-title').textContent = c.company;
+    $('mm-sub').textContent = gg.name;
+    if(!mmap) return;
+    clearPins();
+    const el = document.createElement('div');
+    el.className = 'mm-pin'; el.style.width = el.style.height = '32px';
+    el.title = `${gg.name} · ${fmt(v)} u`;
+    mmMarkers.push(new maplibregl.Marker({element:el}).setLngLat([gg.lon, gg.lat]).addTo(mmap));
+    try{ mmap.flyTo({center:[gg.lon, gg.lat], zoom:4, duration:600}); }catch(e){}
+  }
+  function hoverCard(id){
+    clearTimeout(hoverTimer);
+    const c = CUSTOMERS.find(x=>x.id===id);
+    hoverTimer = setTimeout(()=>showFootprint(c), 55);
+  }
+
+  async function api(path, opts){
+    const r = await fetch(path, opts);
+    if(!r.ok){ throw new Error((await r.text()).slice(0,300) || ('HTTP '+r.status)); }
+    return r.json();
+  }
+
+  // Inlined roster works with NO backend; otherwise hit the API; else a co-located JSON.
+  function inlineCustomers(){
+    try {
+      const el = document.getElementById('customers-data');
+      if(!el) return null;
+      const txt = el.textContent.replace(/\/\*[\s\S]*?\*\//g, '').trim();
+      if(!txt || txt === '{}') return null;
+      return JSON.parse(txt).customers || null;
+    } catch(e){ return null; }
+  }
+  async function loadCustomers(){
+    const inl = inlineCustomers();
+    if(inl && inl.length) return inl;            // works offline / as a static file
+    try { return (await api('/api/customers')).customers || []; }
+    catch(e){
+      try { return (await api('customers.json')).customers || []; }
+      catch(e2){ return null; }                  // null => no data anywhere
+    }
+  }
+
+  async function boot(){
+    try { CFG = await api('/api/config'); } catch(e){ CFG = null; }
+    const list = await loadCustomers();
+    if(list === null){ showOffline(); return; }
+    CUSTOMERS = list;
+    renderHeader();
+    applyFilters();
+    initMiniMap();
+    $('grid').addEventListener('mouseleave', resetFootprint);
+    $('q').addEventListener('input', applyFilters);
+    $('sort').addEventListener('change', applyFilters);
+  }
+
+  function renderHeader(){
+    const n = CUSTOMERS.length;
+    const totSpend = CUSTOMERS.reduce((s,c)=>s+(c.monthly_spend||0),0);
+    const totAvoid = CUSTOMERS.reduce((s,c)=>s+(c.avoidable_spend||0),0);
+    const movable = CUSTOMERS.filter(c=>c.avoidable_spend>0).length;
+    $('sub').innerHTML = CFG
+      ? `${n} synthetic accounts · ` +
+        (CFG.send_live ? `<span class="live">live sending, all email to ${esc(CFG.mail_to)}</span>`
+                       : `<span class="dry">dry run, no email sent (would go to ${esc(CFG.mail_to)})</span>`)
+      : `${n} synthetic accounts · read-only · start <code>server.py</code> to draft and send email`;
+    const uHint = 'Relative units (synthetic list-price-weighted spend), not USD';
+    $('agg').innerHTML =
+      `<div><div class="k">Customers</div><div class="v">${n}</div></div>
+       <div><div class="k">Monthly spend</div><div class="v teal" title="${uHint}">${fmt(totSpend)} u</div></div>
+       <div><div class="k">Avoidable spend</div><div class="v pink" title="${uHint}">${fmt(totAvoid)} u</div></div>
+       <div><div class="k">Worth migrating</div><div class="v">${movable} / ${n}</div></div>`;
+  }
+
+  function applyFilters(){
+    const q = $('q').value.trim().toLowerCase();
+    const sort = $('sort').value;
+    let list = CUSTOMERS.filter(c => !q ||
+      (c.company+' '+c.contact+' '+c.industry).toLowerCase().includes(q));
+    const cmp = {
+      spend:     (a,b)=>b.monthly_spend-a.monthly_spend,
+      avoidable: (a,b)=>b.avoidable_spend-a.avoidable_spend,
+      discount:  (a,b)=>b.discount_pct-a.discount_pct,
+      company:   (a,b)=>a.company.localeCompare(b.company),
+    }[sort];
+    list = list.slice().sort(cmp);
+    renderGrid(list);
+  }
+
+  function renderGrid(list){
+    if(!list.length){ $('grid').innerHTML = '<div class="empty">No customers match your search.</div>'; return; }
+    $('grid').innerHTML = list.map(c => {
+      const moves = c.avoidable_spend>0;
+      return `<div class="ccard" data-id="${esc(c.id)}">
+        <div class="chead">
+          <div><div class="co">${esc(c.company)}</div><div class="ind">${esc(c.industry)}</div></div>
+          <div class="badge${moves?'':' flat'}">${moves?('−'+c.discount_pct+'%'):'on cheapest'}</div>
+        </div>
+        <div class="route">${esc(c.current_cloud_label)}
+          <span class="arrow">→</span> <b>${esc(c.target_cloud_label)}</b></div>
+        <div class="chips">${customerGeos(c).map(([g,v]) =>
+          `<span class="chip" data-geo="${g}" title="${GEO[g].name} · ${fmt(v)} u">${GEO[g].name}</span>`).join('')}</div>
+        <div class="mini">
+          <div><div class="k">Spend</div><div class="v teal">${fmt(c.monthly_spend)} u</div></div>
+          <div><div class="k">Avoidable</div><div class="v pink">${fmt(c.avoidable_spend)} u</div></div>
+          <div><div class="k">Resources</div><div class="v">${c.resource_count}</div></div>
+        </div>
+        <div class="contact"><i class="ph ph-user"></i> ${esc(c.contact)} · ${esc(c.email)}</div>
+      </div>`;
+    }).join('');
+    $('grid').querySelectorAll('.ccard').forEach(el => {
+      const id = el.dataset.id;
+      el.onclick = () => openCustomer(id);
+      el.addEventListener('mouseenter', () => hoverCard(id));
+      el.querySelectorAll('.chip').forEach(ch => {
+        ch.addEventListener('click', e => {
+          e.stopPropagation();                       // map the region, don't open the popup
+          focusRegion(CUSTOMERS.find(x => x.id === id), ch.dataset.geo);
+        });
+      });
+    });
+  }
+
+  function showOffline(){
+    $('sub').textContent = 'Backend not reachable';
+    $('agg').innerHTML = '';
+    $('minimap').style.display = 'none';
+    $('grid').innerHTML =
+      `<div class="empty">No customer data loaded.<br><br>
+       Start the backend to serve the roster:<br>
+       <code>uv run --python 3.12 server.py</code><br>
+       then open <code>http://127.0.0.1:8000/</code> and pick the Customers tab.</div>`;
+  }
+
+  // ---- detail modal + AI draft/send (same endpoints as the grid add-on) ----
+  function openCustomer(id){
+    const c = CUSTOMERS.find(x => x.id === id);
+    if(!c) return;
+    current = c;
+    $('cm-company').textContent = c.company;
+    $('cm-meta').textContent = `${c.contact} · ${c.industry} · ${c.email}`;
+    const movable = c.avoidable_spend > 0;
+    $('cm-stats').innerHTML = `
+      <div class="stat"><div class="k">Resources</div><div class="v">${c.resource_count}</div></div>
+      ${movable
+        ? `<div class="stat"><div class="k">Migration</div>
+             <div class="v move">${esc(c.current_cloud_label)} <b>→ ${esc(c.target_cloud_label)}</b></div></div>`
+        : `<div class="stat"><div class="k">Status</div>
+             <div class="v ok">Already on cheapest cloud</div></div>`}
+      <div class="stat"><div class="k">Discount offer</div>
+        <div class="v disc">${movable ? c.discount_pct + '%' : '—'}</div></div>
+      <div class="stat"><div class="k">Monthly spend</div><div class="v">${fmt(c.monthly_spend)} u</div></div>
+      <div class="stat"><div class="k">Avoidable</div><div class="v">${fmt(c.avoidable_spend)} u</div></div>
+      <div class="stat"><div class="k">Destination</div>
+        <div class="v">${movable ? esc(c.target_cloud_label) : 'No migration needed'}</div></div>`;
+    const rows = c.resources.slice().sort((a,b)=>b.monthly_spend-a.monthly_spend);
+    $('cm-res').innerHTML =
+      `<div class="reshead"><span>Service</span><span>Region</span><span class="rsp">Spend</span><span class="rsv">Save</span></div>` +
+      rows.map(r => `<div class="resrow">
+        <span>${r.units}× ${esc(r.service_label)}</span>
+        <span>${esc(r.geo_label)}</span>
+        <span class="rsp">${fmt(r.monthly_spend)}</span>
+        <span class="rsv">${Math.round(r.savings_ratio*100)}%</span></div>`).join('');
+    $('cm-email').classList.remove('show');
+    $('cm-subject').value = ''; $('cm-body').value = '';
+    $('cm-model').textContent = ''; $('cm-status').textContent = ''; $('cm-status').className='status';
+    $('cm-draft').disabled = !CFG || !movable;   // no backend, or nothing to pitch
+    $('cm-draft').innerHTML = !CFG    ? 'Drafting needs the backend'
+                            : !movable ? 'No migration to pitch'
+                                       : '<i class="ph ph-sparkle"></i> Draft email with AI';
+    $('cust-modal').classList.add('open');
+  }
+  function closeModal(){ $('cust-modal').classList.remove('open'); }
+  $('cust-close').onclick = closeModal;
+  $('cust-modal').onclick = e => { if(e.target.id==='cust-modal') closeModal(); };
+  document.addEventListener('keydown', e => { if(e.key==='Escape') closeModal(); });
+
+  $('cm-draft').onclick = async () => {
+    if(!current) return;
+    const btn = $('cm-draft');
+    btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Drafting…';
+    try {
+      const d = await api('/api/draft', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({customer_id: current.id})
+      });
+      $('cm-subject').value = d.subject || '';
+      $('cm-body').value = d.body || '';
+      $('cm-model').textContent = 'Drafted by ' + (d.model || 'template') + ' · edit before sending';
+      $('cm-email').classList.add('show');
+      btn.innerHTML = '<i class="ph ph-sparkle"></i> Re-draft';
+    } catch(e){
+      $('cm-status').className = 'status err';
+      $('cm-status').textContent = 'Draft failed: ' + e.message;
+    } finally { btn.disabled = false; }
+  };
+
+  $('cm-send').onclick = async () => {
+    if(!current) return;
+    const btn = $('cm-send'), st = $('cm-status');
+    btn.disabled = true; st.className='status'; st.innerHTML = '<span class="spin"></span>Sending…';
+    try {
+      const r = await api('/api/send', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({customer_id: current.id,
+          subject: $('cm-subject').value, body: $('cm-body').value})
+      });
+      if(r.status === 'sent'){
+        st.className='status ok';
+        st.innerHTML = `<i class="ph ph-check"></i> Sent to ${esc(r.to)}` + (r.id ? ` (id ${esc(r.id)})` : '');
+      } else {
+        st.className='status warn';
+        st.textContent = `Dry-run — would send to ${r.to}. ${r.detail||''}`;
+      }
+    } catch(e){
+      st.className='status err'; st.textContent = 'Send failed: ' + e.message;
+    } finally { btn.disabled = false; }
+  };
+
+  boot();
+})();
+</script>
+</body>
+</html>

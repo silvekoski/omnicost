@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Omnicost · Map</title>
+<link href="https://unpkg.com/maplibre-gl@^5/dist/maplibre-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/maplibre-gl@^5/dist/maplibre-gl.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" /><style>
+  .ph{vertical-align:-.125em}
+  :root{
+    --bg:#17181c; --panel:rgba(31,33,39,.88); --panel-solid:#1f2127;
+    --line:#2e3138; --txt:#f4f3f0; --muted:#8c8a84; --accent:#5e8d77; --accent2:#7ba78f;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);
+    font-family:Helvetica,"Helvetica Neue",Arial,sans-serif}
+  #map{position:absolute;inset:0}
+  .maplibregl-popup-content{
+    background:var(--panel-solid);color:var(--txt);border:1px solid var(--line);
+    border-radius:12px;padding:14px 16px;box-shadow:0 12px 40px rgba(0,0,0,.55);min-width:230px}
+  .maplibregl-popup-tip{border-top-color:var(--panel-solid)!important;border-bottom-color:var(--panel-solid)!important}
+  .maplibregl-popup-close-button{color:var(--muted);font-size:18px;padding:2px 7px}
+
+  .card{position:absolute;background:var(--panel);backdrop-filter:blur(14px);
+    border:1px solid var(--line);border-radius:14px;box-shadow:0 10px 36px rgba(0,0,0,.45)}
+  /* header */
+
+  /* legend / controls */
+  #legend{top:16px;right:16px;padding:13px 15px;width:236px}
+  .lg-title{font-size:10.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin:0 0 8px}
+  .svc{display:flex;align-items:center;gap:9px;padding:5px 6px;border-radius:8px;cursor:pointer;
+    font-size:12.5px;user-select:none;transition:background .12s}
+  .svc:hover{background:rgba(255,255,255,.05)}
+  .svc.off{opacity:.34}
+  .sw{width:13px;height:13px;border-radius:3px;flex:none;box-shadow:0 0 0 1px rgba(255,255,255,.18)}
+  .svc .amt{margin-left:auto;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+  .divider{height:1px;background:var(--line);margin:12px 0}
+  .row{display:flex;gap:7px;flex-wrap:wrap}
+  .btn{flex:1;min-width:0;text-align:center;font-size:12px;padding:7px 8px;border-radius:9px;cursor:pointer;
+    border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--txt);transition:all .12s;white-space:nowrap}
+  .btn:hover{background:rgba(255,255,255,.10)}
+  .btn.active{background:var(--accent);color:#f4f3f0;border-color:var(--accent);font-weight:650}
+  .btn.cloud.off{opacity:.4}
+  .lbl{font-size:10.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin:0 0 7px}
+
+  /* footer note */
+  #note{bottom:14px;left:16px;padding:9px 13px;max-width:430px;font-size:10.5px;color:var(--muted);line-height:1.55}
+  #note b{color:#cfcdc6;font-weight:600}
+
+  /* popup internals */
+  .pp-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:2px}
+  .pp-geo{font-size:14px;font-weight:650}
+  .pp-cloud{font-size:11px;color:var(--accent2);font-weight:600}
+  .pp-place{font-size:10.5px;color:var(--muted);margin-bottom:9px}
+  .pp-tot{font-size:11px;margin-bottom:9px}
+  .pp-tot b{font-size:14px}
+  .pp-svc{display:grid;grid-template-columns:11px 1fr auto;gap:7px;align-items:center;
+    font-size:11.5px;margin:4px 0}
+  .pp-bar{height:6px;border-radius:3px;background:rgba(255,255,255,.07);overflow:hidden}
+  .pp-bar i{display:block;height:100%;border-radius:3px}
+  .pp-val{font-variant-numeric:tabular-nums;color:var(--muted);font-size:10.5px}
+  .pp-name{display:flex;align-items:center;gap:6px;min-width:0}
+  .pp-name span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  /* ---- conflict proximity panel (top-left) ---- */
+  #risk{top:16px;left:16px;width:272px;padding:13px 15px;max-height:calc(100% - 32px);overflow:auto}
+  #risk .ti{font-size:12.5px;font-weight:650;display:flex;align-items:center;gap:7px}
+  #risk .sub{font-size:10px;color:var(--muted);margin:6px 0 11px;line-height:1.5}
+  .dc{display:flex;align-items:flex-start;gap:9px;padding:8px;border-radius:9px;margin-bottom:5px;
+    background:rgba(255,255,255,.03);border:1px solid var(--line)}
+  .dc .dot{width:9px;height:9px;border-radius:50%;margin-top:4px;flex:none;box-shadow:0 0 7px currentColor}
+  .dc .nm{font-size:12px;font-weight:600}
+  .dc .meta{font-size:10px;color:var(--muted);line-height:1.5;margin-top:2px}
+  .dc .meta b{color:#cfcdc6;font-weight:600}
+  .dc .lvl{margin-left:auto;font-size:8.5px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;
+    padding:2px 7px;border-radius:6px;white-space:nowrap;align-self:flex-start}
+  .lvl-high{background:rgba(194,90,58,.16);color:#d98b6b}
+  .lvl-elevated{background:rgba(212,163,90,.16);color:#e0b878}
+  .lvl-watch{background:rgba(139,148,160,.14);color:#aeb4ba}
+  .lvl-clear{background:rgba(123,167,143,.14);color:#84b89c}
+  .dot-high{color:#cf6244;background:#cf6244}
+  .dot-elevated{color:#d4a35a;background:#d4a35a}
+  .dot-watch{color:#8b94a0;background:#8b94a0}
+  .dot-clear{color:#7ba78f;background:#7ba78f}
+
+  /* conflict controls (inside legend) */
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px}
+  .ctl{display:flex;align-items:center;gap:9px;font-size:11.5px;margin:2px 0}
+  .ctl label{color:var(--muted);min-width:42px}
+  .ctl input[type=range]{flex:1;accent-color:var(--accent);height:3px}
+  .ctl .val{font-variant-numeric:tabular-nums;color:var(--txt);min-width:56px;text-align:right}
+  .seg{display:flex;gap:4px}
+  .seg .s{flex:1;text-align:center;font-size:11px;padding:5px 0;border-radius:7px;cursor:pointer;
+    border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--muted);transition:all .12s}
+  .seg .s:hover{color:var(--txt)}
+  .seg .s.on{background:var(--accent);color:#14151a;border-color:var(--accent);font-weight:650}
+  #cf-status{font-size:10px;color:var(--muted);margin-top:8px;line-height:1.45;min-height:13px}
+  #cf-status.err{color:#d98b6b}
+
+  /* conflict popup */
+  .cf-type{font-size:13px;font-weight:650}
+  .cf-place{font-size:11px;color:var(--muted);margin:2px 0 9px}
+  .cf-grid{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:11px;line-height:1.5}
+  .cf-grid .k{color:var(--muted)}
+  .cf-grid .v{color:var(--txt);text-align:right;font-variant-numeric:tabular-nums}
+  .cf-link{display:inline-flex;align-items:center;gap:5px;margin-top:10px;font-size:11px;
+    color:var(--accent);text-decoration:none}
+  .cf-link:hover{text-decoration:underline}
+  .cf-badge{display:inline-block;font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;
+    padding:2px 6px;border-radius:5px;background:rgba(194,90,58,.18);color:#d98b6b;margin-left:7px;vertical-align:1px}
+
+  /* region cards become clickable */
+  .dc{cursor:pointer;transition:background .12s,border-color .12s}
+  .dc:hover{background:rgba(255,255,255,.07);border-color:var(--accent)}
+
+  /* ---- region → customers → email modal ---- */
+  .modal{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;
+    padding:24px;background:rgba(19,20,25,.62);backdrop-filter:blur(4px)}
+  .modal.open{display:flex}
+  .gcard{background:var(--panel-solid);border:1px solid var(--line);border-radius:16px;
+    width:min(460px,100%);max-height:88vh;overflow:auto;padding:18px 20px;box-shadow:0 24px 70px rgba(0,0,0,.6)}
+  .gm-x{float:right;cursor:pointer;background:none;border:0;color:var(--muted);font-size:20px;line-height:1;padding:0 4px}
+  .gm-x:hover{color:var(--txt)}
+  .gm-back{cursor:pointer;background:none;border:0;color:var(--accent2);font-size:12px;padding:0;
+    margin-bottom:8px;display:inline-flex;align-items:center;gap:5px}
+  .gm-h{font-size:16px;font-weight:650;margin:0}
+  .gm-sub{font-size:11px;color:var(--muted);margin:3px 0 12px;line-height:1.5}
+  .gm-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 9px;
+    border-radius:9px;cursor:pointer;border:1px solid transparent}
+  .gm-row:hover{background:rgba(255,255,255,.05);border-color:var(--line)}
+  .gm-name{font-size:12.5px;font-weight:600}
+  .gm-meta{font-size:10.5px;color:var(--muted);margin-top:1px}
+  .gm-meta b{color:var(--accent2)}
+  .gm-badge{font-size:11px;font-weight:700;color:#d98b6b;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .gm-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:10px 0 12px}
+  .gm-stat{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:9px;padding:7px 9px}
+  .gm-stat .k{font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+  .gm-stat .v{font-size:14px;font-weight:650;margin-top:2px}
+  .gm-res{border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-bottom:12px}
+  .gm-rr{display:grid;grid-template-columns:1.6fr .9fr .7fr;gap:6px;padding:5px 10px;font-size:11px;
+    border-bottom:1px dashed rgba(255,255,255,.07)}
+  .gm-rr:last-child{border-bottom:0}
+  .gm-rr .sp{text-align:right;color:var(--accent2);font-variant-numeric:tabular-nums}
+  .gm-btn{font:inherit;font-size:12.5px;font-weight:600;border-radius:9px;cursor:pointer;padding:9px 14px;
+    border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--txt)}
+  .gm-btn:hover{background:rgba(255,255,255,.1)}
+  .gm-btn:disabled{opacity:.5;cursor:default}
+  .gm-btn.primary{background:#84b89c;border-color:#84b89c;color:#14151a}
+  .gm-btn.primary:hover{filter:brightness(1.08)}
+  .gm-btn.send{background:#c87f59;border-color:#c87f59;color:#f4f3f0}
+  .gm-eb label{display:block;font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin:9px 0 4px}
+  .gm-eb input,.gm-eb textarea{width:100%;background:#1a1b20;color:var(--txt);border:1px solid var(--line);
+    border-radius:8px;padding:8px 10px;font:inherit;font-size:12.5px;line-height:1.5;resize:vertical}
+  .gm-eb textarea{min-height:170px}
+  .gm-actions{display:flex;gap:9px;align-items:center;margin-top:12px;flex-wrap:wrap}
+  .gm-note{font-size:10px;color:var(--muted);margin-top:5px}
+  .gm-status{font-size:11.5px}
+  .gm-status.ok{color:#84b89c}.gm-status.warn{color:#e0b878}.gm-status.err{color:#d98b6b}
+  .gm-spin{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.25);
+    border-top-color:#f4f3f0;border-radius:50%;animation:gmsp .7s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes gmsp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div id="legend" class="card">
+  <p class="lg-title">Services · click to filter</p>
+  <div id="svc-list"></div>
+  <div class="divider"></div>
+  <p class="lbl">Clouds · click to toggle</p>
+  <div class="row" id="cloud-row"></div>
+  <div class="divider"></div>
+  <p class="lbl">Height scale</p>
+  <div class="row">
+    <div class="btn active" id="h-sqrt" title="Compresses the range so small regions stay visible">Balanced</div>
+    <div class="btn" id="h-linear" title="Box height strictly proportional to spend">True&nbsp;scale</div>
+  </div>
+  <div class="divider"></div>
+  <div class="toggle-row">
+    <p class="lbl" style="margin:0">Conflicts · GDELT</p>
+    <div class="btn active" id="cf-toggle" style="flex:none;padding:5px 12px">On</div>
+  </div>
+  <p class="lbl" style="margin:0 0 5px">Time window</p>
+  <div class="seg" id="cf-window">
+    <div class="s" data-h="6">6 h</div>
+    <div class="s on" data-h="24">24 h</div>
+    <div class="s" data-h="72">72 h</div>
+  </div>
+  <p class="lbl" style="margin:9px 0 5px">Show</p>
+  <div class="seg" id="cf-scope">
+    <div class="s on" data-major="1" title="Only widely-reported, geopolitical-scale conflict (filters out GDELT's miscoded soft news)">Major only</div>
+    <div class="s" data-major="0" title="Every material-conflict event GDELT coded — includes noise">All events</div>
+  </div>
+  <div class="ctl" style="margin-top:9px">
+    <label>Radius</label>
+    <input type="range" id="cf-radius" min="250" max="3000" step="250" value="1000">
+    <span class="val" id="cf-radius-val">1000 km</span>
+  </div>
+  <div id="cf-status">Loading conflict data…</div>
+  <div class="divider"></div>
+  <div class="row">
+    <div class="btn" id="globe"><i class="ph ph-globe-hemisphere-west"></i> Globe</div>
+    <div class="btn" id="reset"><i class="ph ph-arrows-out"></i> Reset view</div>
+  </div>
+</div>
+
+<div id="risk" class="card">
+  <div class="ti" title="Risk level is set by major conflicts: widely reported, geopolitical-scale events (roughly 20+ news articles). Local lower-level incidents are counted but do not raise the level."><i class="ph ph-warning-octagon" style="color:#d98b6b"></i> Conflict risk by region</div>
+  <p class="sub" id="risk-sub">Live geopolitical conflict near each datacenter region, from GDELT. Click any region for its customers.</p>
+  <div id="dc-list"></div>
+</div>
+
+<!-- Region → customers → AI email. Self-contained; uses the same /api endpoints. -->
+<div class="modal" id="geo-modal"><div class="gcard" id="geo-card"></div></div>
+
+<div id="note" class="card">
+  <b>Reading the map:</b> at each region the three boxes are arranged in a triangle — Cloud B (N),
+  Cloud D (SE), Cloud C (SW). Drag to rotate, scroll to zoom, click a box for the full breakdown.
+  Figures are <b>synthetic list-price-weighted spend</b> (relative ratios, not USD). “Other” is non-geographic and parked on a neutral spot (Sahara).
+</div>
+
+<script id="region-data" type="application/json">
+{"generated_from":"aiven_usage.parquet x cross_cloud_list_prices.parquet (priced synthetic spend)","metric":"Synthetic list-price-weighted spend (amount x p50 ratio). Relative, not USD.","clouds":["cloud_b","cloud_c","cloud_d"],"cloudLabels":{"cloud_b":"Cloud B","cloud_c":"Cloud C","cloud_d":"Cloud D"},"serviceOrder":["database-relational","streaming","search","database-nosql","observability","analytics"],"serviceColors":{"database-relational":"#7ba78f","streaming":"#c8795a","search":"#d6b06a","database-nosql":"#7e8fb0","observability":"#b079a0","analytics":"#5f97a6"},"geos":{"us-east":{"name":"US East","place":"Eastern US","lat":39.5,"lon":-80.5,"synthetic":false},"us-west":{"name":"US West","place":"Western US","lat":43.8,"lon":-116.5,"synthetic":false},"eu-west":{"name":"EU West","place":"Western Europe","lat":48.9,"lon":2.4,"synthetic":false},"eu-north":{"name":"EU North","place":"Nordics","lat":62.3,"lon":26.5,"synthetic":false},"apac":{"name":"APAC","place":"Southeast Asia","lat":3.8,"lon":101.8,"synthetic":false},"other":{"name":"Other","place":"Multi / unbucketed","lat":16.0,"lon":-4.0,"synthetic":true}},"columns":[{"geo":"us-east","cloud":"cloud_b","total":880694,"services":{"database-relational":431501,"streaming":271391,"search":96696,"database-nosql":62912,"observability":9680,"analytics":8514}},{"geo":"us-east","cloud":"cloud_c","total":251009,"services":{"database-relational":75329,"streaming":125810,"search":12225,"database-nosql":26884,"observability":10340,"analytics":421}},{"geo":"us-east","cloud":"cloud_d","total":1120220,"services":{"database-relational":699818,"streaming":332451,"search":25527,"database-nosql":49313,"observability":8955,"analytics":4157}},{"geo":"us-west","cloud":"cloud_b","total":120226,"services":{"database-relational":69096,"streaming":20205,"search":23151,"database-nosql":5203,"observability":1066,"analytics":1505}},{"geo":"us-west","cloud":"cloud_c","total":52686,"services":{"database-relational":35364,"streaming":12777,"search":244,"database-nosql":4098,"observability":181,"analytics":21}},{"geo":"us-west","cloud":"cloud_d","total":681827,"services":{"database-relational":592219,"streaming":66075,"search":16400,"database-nosql":5219,"observability":1753,"analytics":162}},{"geo":"eu-west","cloud":"cloud_b","total":2828338,"services":{"database-relational":1223267,"streaming":619510,"search":616811,"database-nosql":328839,"observability":24571,"analytics":15341}},{"geo":"eu-west","cloud":"cloud_c","total":493178,"services":{"database-relational":222897,"streaming":147220,"search":59593,"database-nosql":37656,"observability":23158,"analytics":2654}},{"geo":"eu-west","cloud":"cloud_d","total":1588184,"services":{"database-relational":626326,"streaming":767439,"search":58471,"database-nosql":44978,"observability":84140,"analytics":6830}},{"geo":"eu-north","cloud":"cloud_b","total":346517,"services":{"database-relational":33731,"streaming":154166,"search":76460,"database-nosql":76920,"observability":4744,"analytics":496}},{"geo":"eu-north","cloud":"cloud_c","total":117519,"services":{"database-relational":63662,"streaming":30168,"search":13481,"database-nosql":3064,"observability":5439,"analytics":1706}},{"geo":"eu-north","cloud":"cloud_d","total":609512,"services":{"database-relational":198687,"streaming":381251,"search":8545,"database-nosql":18369,"observability":1348,"analytics":1313}},{"geo":"apac","cloud":"cloud_b","total":465519,"services":{"database-relational":164290,"streaming":140135,"search":110259,"database-nosql":42305,"observability":3122,"analytics":5407}},{"geo":"apac","cloud":"cloud_c","total":68519,"services":{"database-relational":18883,"streaming":23181,"search":404,"database-nosql":25018,"observability":385,"analytics":648}},{"geo":"apac","cloud":"cloud_d","total":518608,"services":{"database-relational":419525,"streaming":72767,"search":4854,"database-nosql":13304,"observability":2678,"analytics":5481}},{"geo":"other","cloud":"cloud_b","total":1533942,"services":{"database-relational":604794,"streaming":496262,"search":252476,"database-nosql":150588,"observability":9709,"analytics":20113}},{"geo":"other","cloud":"cloud_c","total":921048,"services":{"database-relational":314555,"streaming":178291,"search":295301,"database-nosql":130527,"observability":312,"analytics":2061}},{"geo":"other","cloud":"cloud_d","total":66739,"services":{"database-relational":39501,"streaming":11882,"search":243,"database-nosql":2157,"observability":1015,"analytics":11941}}],"maxTotal":2828338,"grandTotal":12664285}
+</script>
+
+<script>
+const KEY = "i8lJsOawA4GXGnYwJmLL";
+const DATA = JSON.parse(document.getElementById("region-data").textContent);
+
+// ---- geometry tuning ----
+const MAXH        = 1500000;   // metres of extrusion at the largest column
+const HALF        = 85000;     // half-width of each box footprint (m) -> 170km box
+const OFFSET      = 115000;    // distance of each cloud's box from the region centre (m)
+const BEARINGS    = { cloud_b: 0, cloud_d: 130, cloud_c: 230 }; // N, SE, SW
+
+// ---- state ----
+const state = {
+  heightMode: "sqrt",
+  cloudsOn:   { cloud_b:true, cloud_c:true, cloud_d:true },
+  servicesOn: Object.fromEntries(DATA.serviceOrder.map(s=>[s,true])),
+};
+
+// ---- geo helpers ----
+const R = 6371000;
+function dest(lat, lon, bearingDeg, distM){
+  const br=bearingDeg*Math.PI/180, d=distM/R;
+  const la1=lat*Math.PI/180, lo1=lon*Math.PI/180;
+  const la2=Math.asin(Math.sin(la1)*Math.cos(d)+Math.cos(la1)*Math.sin(d)*Math.cos(br));
+  const lo2=lo1+Math.atan2(Math.sin(br)*Math.sin(d)*Math.cos(la1), Math.cos(d)-Math.sin(la1)*Math.sin(la2));
+  return [lo2*180/Math.PI, la2*180/Math.PI];
+}
+function square(lon, lat, half){
+  const dLat=half/111320;
+  const dLon=half/(111320*Math.cos(lat*Math.PI/180));
+  return [[ [lon-dLon,lat-dLat],[lon+dLon,lat-dLat],[lon+dLon,lat+dLat],
+            [lon-dLon,lat+dLat],[lon-dLon,lat-dLat] ]];
+}
+function boxCentre(geoKey, cloud){
+  const g=DATA.geos[geoKey];
+  return dest(g.lat, g.lon, BEARINGS[cloud], OFFSET);
+}
+const fmt = n => n>=1e6 ? (n/1e6).toFixed(2)+"M" : n>=1e3 ? Math.round(n/1e3)+"k" : Math.round(n);
+
+// height of a full column (metres) for a given total
+function columnHeight(total){
+  const r = total / DATA.maxTotal;
+  return state.heightMode==="sqrt" ? Math.sqrt(r)*MAXH : r*MAXH;
+}
+
+// ---- build the extrusion GeoJSON (one feature per visible service segment) ----
+function buildExtrusions(){
+  const feats=[];
+  for(const col of DATA.columns){
+    if(!state.cloudsOn[col.cloud]) continue;
+    const visTotal = DATA.serviceOrder.reduce((a,s)=> a + (state.servicesOn[s]?(col.services[s]||0):0), 0);
+    if(visTotal<=0) continue;
+    const colH = columnHeight(col.total);              // full column height keyed to true total
+    const [lon,lat] = boxCentre(col.geo, col.cloud);
+    let base=0;
+    for(const svc of DATA.serviceOrder){
+      if(!state.servicesOn[svc]) continue;
+      const spend=col.services[svc]||0;
+      if(spend<=0) continue;
+      const segH = (spend/col.total)*colH;             // segment keeps its true share of the column
+      feats.push({
+        type:"Feature",
+        geometry:{type:"Polygon",coordinates:square(lon,lat,HALF)},
+        properties:{
+          base, height: base+segH, color: DATA.serviceColors[svc],
+          geo: col.geo, cloud: col.cloud, service: svc, spend, total: col.total
+        }
+      });
+      base+=segH;
+    }
+  }
+  return {type:"FeatureCollection",features:feats};
+}
+
+// ---- labels (region names + per-box cloud letter) ----
+function buildLabels(){
+  const feats=[];
+  for(const key in DATA.geos){
+    const g=DATA.geos[key];
+    feats.push({type:"Feature",geometry:{type:"Point",coordinates:[g.lon,g.lat]},
+      properties:{kind:"region",label:g.name.toUpperCase(),place:g.place}});
+  }
+  for(const col of DATA.columns){
+    const [lon,lat]=boxCentre(col.geo,col.cloud);
+    feats.push({type:"Feature",geometry:{type:"Point",coordinates:[lon,lat]},
+      properties:{kind:"cloud",label:DATA.cloudLabels[col.cloud].replace("Cloud ",""),cloud:col.cloud}});
+  }
+  return {type:"FeatureCollection",features:feats};
+}
+
+// ---- bounds across every box so "fit all" frames the whole footprint ----
+function dataBounds(){
+  const b=new maplibregl.LngLatBounds();
+  for(const key in DATA.geos){
+    for(const c of DATA.clouds){ b.extend(boxCentre(key,c)); }
+  }
+  return b;
+}
+
+// ---------------------------------------------------------------------------
+const map = new maplibregl.Map({
+  container:"map",
+  style:`https://api.maptiler.com/maps/dataviz-dark/style.json?key=${KEY}`,
+  center:[-12,34], zoom:1.7, pitch:55, bearing:-12,
+  maxPitch:80, antialias:true,
+});
+map.addControl(new maplibregl.NavigationControl({visualizePitch:true}), "bottom-right");
+map.dragRotate.enable();
+
+function fitAll(opts={}){
+  map.fitBounds(dataBounds(), {padding:{top:120,bottom:90,left:80,right:280},
+    pitch:55, bearing:-12, duration:opts.duration ?? 900, maxZoom:3.2});
+}
+
+map.on("load", ()=>{
+  map.addSource("ext",{type:"geojson",data:buildExtrusions()});
+  map.addLayer({
+    id:"boxes", type:"fill-extrusion", source:"ext",
+    paint:{
+      "fill-extrusion-color":["get","color"],
+      "fill-extrusion-base":["get","base"],
+      "fill-extrusion-height":["get","height"],
+      "fill-extrusion-opacity":0.92,
+      "fill-extrusion-vertical-gradient":true,
+    }
+  });
+
+  map.addSource("labels",{type:"geojson",data:buildLabels()});
+  map.addLayer({
+    id:"region-labels", type:"symbol", source:"labels",
+    filter:["==",["get","kind"],"region"],
+    layout:{
+      "text-field":["get","label"],"text-size":14,"text-letter-spacing":0.12,
+      "text-font":["Metropolis Bold","Noto Sans Bold"],
+      "text-offset":[0,0.2],"text-anchor":"center","text-allow-overlap":true,
+    },
+    paint:{"text-color":"#f4f3f0","text-halo-color":"#17181c","text-halo-width":1.8}
+  });
+  map.addLayer({
+    id:"cloud-labels", type:"symbol", source:"labels",
+    filter:["==",["get","kind"],"cloud"],
+    layout:{
+      "text-field":["get","label"],"text-size":12,
+      "text-font":["Metropolis Bold","Noto Sans Bold"],
+      "text-allow-overlap":true,"text-anchor":"center",
+    },
+    paint:{"text-color":"#cfcdc6","text-halo-color":"#17181c","text-halo-width":1.6}
+  });
+
+  fitAll({duration:0});
+
+  // interactions
+  map.on("click","boxes", e=>{
+    const f=e.features[0]; if(!f) return;
+    const col=DATA.columns.find(c=>c.geo===f.properties.geo && c.cloud===f.properties.cloud);
+    if(col) showPopup(col, e.lngLat);
+  });
+  map.on("mouseenter","boxes",()=>map.getCanvas().style.cursor="pointer");
+  map.on("mouseleave","boxes",()=>map.getCanvas().style.cursor="");
+});
+
+function showPopup(col, lngLat){
+  const g=DATA.geos[col.geo];
+  let rows="";
+  for(const svc of DATA.serviceOrder){
+    const v=col.services[svc]||0; if(v<=0) continue;
+    const pct=(v/col.total*100);
+    const dim = state.servicesOn[svc] ? 1 : .3;
+    rows+=`<div class="pp-svc" style="opacity:${dim}">
+        <span class="sw" style="background:${DATA.serviceColors[svc]}"></span>
+        <div class="pp-name"><div class="pp-bar" style="width:100%"><i style="width:${pct}%;background:${DATA.serviceColors[svc]}"></i></div></div>
+        <span class="pp-val">${fmt(v)} · ${pct.toFixed(0)}%</span>
+      </div>
+      <div style="grid-column:2;font-size:10px;color:var(--muted);margin:-2px 0 4px">${svc}</div>`;
+  }
+  const html=`
+    <div class="pp-head"><span class="pp-geo">${g.name}</span><span class="pp-cloud">${DATA.cloudLabels[col.cloud]}</span></div>
+    <div class="pp-place">${g.place}</div>
+    <div class="pp-tot">Total spend &nbsp;<b style="color:var(--accent2)">${fmt(col.total)}</b></div>
+    ${rows}`;
+  new maplibregl.Popup({offset:14,maxWidth:"290px"}).setLngLat(lngLat).setHTML(html).addTo(map);
+}
+
+function refresh(){ map.getSource("ext")?.setData(buildExtrusions()); }
+
+// ---------- UI ----------
+// service legend
+const svcList=document.getElementById("svc-list");
+const svcTotals=Object.fromEntries(DATA.serviceOrder.map(s=>[s,0]));
+for(const c of DATA.columns) for(const s in c.services) svcTotals[s]+=c.services[s];
+DATA.serviceOrder.forEach(svc=>{
+  const el=document.createElement("div");
+  el.className="svc"; el.dataset.svc=svc;
+  el.innerHTML=`<span class="sw" style="background:${DATA.serviceColors[svc]}"></span>
+    <span>${svc}</span><span class="amt">${fmt(svcTotals[svc])}</span>`;
+  el.onclick=()=>{ state.servicesOn[svc]=!state.servicesOn[svc];
+    el.classList.toggle("off",!state.servicesOn[svc]); refresh(); };
+  svcList.appendChild(el);
+});
+
+// cloud toggles
+const cloudRow=document.getElementById("cloud-row");
+DATA.clouds.forEach(c=>{
+  const el=document.createElement("div");
+  el.className="btn cloud active"; el.textContent=DATA.cloudLabels[c];
+  el.onclick=()=>{ state.cloudsOn[c]=!state.cloudsOn[c];
+    el.classList.toggle("off",!state.cloudsOn[c]); el.classList.toggle("active",state.cloudsOn[c]); refresh(); };
+  cloudRow.appendChild(el);
+});
+
+// height mode
+const hSqrt=document.getElementById("h-sqrt"), hLin=document.getElementById("h-linear");
+hSqrt.onclick=()=>{ state.heightMode="sqrt"; hSqrt.classList.add("active"); hLin.classList.remove("active"); refresh(); };
+hLin.onclick =()=>{ state.heightMode="linear"; hLin.classList.add("active"); hSqrt.classList.remove("active"); refresh(); };
+
+// globe + reset
+let globeOn=false;
+document.getElementById("globe").onclick=function(){
+  globeOn=!globeOn;
+  try{ map.setProjection({type: globeOn?"globe":"mercator"}); }catch(e){ console.warn("projection",e); }
+  this.classList.toggle("active",globeOn);
+};
+document.getElementById("reset").onclick=()=>{ globeOn=false;
+  document.getElementById("globe").classList.remove("active");
+  try{map.setProjection({type:"mercator"});}catch(e){}
+  fitAll(); };
+
+// ===========================================================================
+// CONFLICT OVERLAY (GDELT)  — points + per-region proximity risk
+// Reuses dest() (geodesic offset) and DATA.geos (region anchors) from above.
+// ===========================================================================
+const cf = { on:true, hours:24, radius:1000, majorOnly:true, data:null, ready:false };
+const CF_LAYERS = ["risk-ring-fill","risk-ring-line","conflict-glow","conflict-points"];
+const LVL_COLOR = {high:"#cf6244", elevated:"#d4a35a", watch:"#8b94a0", clear:"#7ba78f"};
+// display labels: a consistent severity ladder (High > Elevated > Low > Clear).
+// "watch" stays the internal key (drives CSS + colors) but reads as "Low".
+const LVL_LABEL = {high:"High", elevated:"Elevated", watch:"Low", clear:"Clear"};
+const numfmt = n => Number(n).toLocaleString("en-US");
+
+function cfStatus(msg, isErr){
+  const el=document.getElementById("cf-status");
+  el.textContent=msg; el.classList.toggle("err",!!isErr);
+}
+// great-circle distance in km (for the "nearest region" line in popups)
+function havKm(la1,lo1,la2,lo2){
+  const r=6371, t=Math.PI/180;
+  const dLa=(la2-la1)*t, dLo=(lo2-lo1)*t;
+  const a=Math.sin(dLa/2)**2 + Math.cos(la1*t)*Math.cos(la2*t)*Math.sin(dLo/2)**2;
+  return 2*r*Math.asin(Math.min(1,Math.sqrt(a)));
+}
+// geodesic circle polygon (a "danger radius" ring) using the existing dest() helper
+function geoCircle(lat,lon,radiusKm,steps=72){
+  const ring=[];
+  for(let i=0;i<=steps;i++) ring.push(dest(lat,lon,(i/steps)*360,radiusKm*1000));
+  return ring;
+}
+function buildRings(datacenters, radiusKm){
+  const feats=(datacenters||[]).filter(d=>d.level!=="clear").map(d=>({
+    type:"Feature",
+    geometry:{type:"Polygon",coordinates:[geoCircle(d.lat,d.lon,radiusKm)]},
+    properties:{level:d.level,name:d.name}
+  }));
+  return {type:"FeatureCollection",features:feats};
+}
+function fmtSlot(ts){ // "20260524100000" -> "2026-05-24 10:00"
+  if(!ts||ts.length<12) return "";
+  return `${ts.slice(0,4)}-${ts.slice(4,6)}-${ts.slice(6,8)} ${ts.slice(8,10)}:${ts.slice(10,12)}`;
+}
+
+function addConflictLayers(){
+  map.addSource("risk-rings",{type:"geojson",data:{type:"FeatureCollection",features:[]}});
+  map.addSource("conflicts", {type:"geojson",data:{type:"FeatureCollection",features:[]}});
+
+  const ringColor=["match",["get","level"],"high",LVL_COLOR.high,"elevated",LVL_COLOR.elevated,
+                   "watch",LVL_COLOR.watch,LVL_COLOR.clear];
+
+  // rings sit *under* the spend boxes so the 3D columns stay readable
+  map.addLayer({id:"risk-ring-fill",type:"fill",source:"risk-rings",
+    paint:{"fill-color":ringColor,"fill-opacity":0.045}}, "boxes");
+  map.addLayer({id:"risk-ring-line",type:"line",source:"risk-rings",
+    paint:{"line-color":ringColor,"line-width":1.4,"line-opacity":0.75,"line-dasharray":[2.5,2]}}, "boxes");
+
+  // a soft red halo behind major events; then the points themselves on top
+  map.addLayer({id:"conflict-glow",type:"circle",source:"conflicts",
+    filter:["==",["get","major"],true],
+    paint:{"circle-color":"#cf6244","circle-blur":1,"circle-opacity":0.32,
+      "circle-radius":["interpolate",["linear"],["zoom"],1.2,9,5,24]}});
+  map.addLayer({id:"conflict-points",type:"circle",source:"conflicts",
+    filter:["==",["get","major"],true],   // default: major-only (clean); cleared for "All"
+    paint:{
+      "circle-color":["interpolate",["linear"],["get","severity"],
+        0.35,"#e0b878", 0.6,"#d4a35a", 0.78,"#c87f59", 0.92,"#b15c34"],
+      "circle-radius":["interpolate",["linear"],["zoom"],
+        1.2,["max",2.2,["*",0.7,["sqrt",["get","articles"]]]],
+        5,  ["max",4,  ["*",1.7,["sqrt",["get","articles"]]]]],
+      "circle-stroke-width":["case",["get","major"],1.2,0.4],
+      "circle-stroke-color":["case",["get","major"],"#f4f3f0","rgba(255,255,255,.35)"],
+      "circle-opacity":0.92,
+    }});
+
+  map.on("click","conflict-points", e=>{ if(e.features[0]) showConflictPopup(e.features[0], e.lngLat); });
+  map.on("mouseenter","conflict-points",()=>map.getCanvas().style.cursor="pointer");
+  map.on("mouseleave","conflict-points",()=>map.getCanvas().style.cursor="");
+  cf.ready=true;
+}
+
+function showConflictPopup(f, lngLat){
+  const p=f.properties;
+  let best=null;
+  for(const k in DATA.geos){ const g=DATA.geos[k]; if(g.synthetic) continue;
+    const d=havKm(g.lat,g.lon,lngLat.lat,lngLat.lng);
+    if(!best||d<best.km) best={km:d,name:g.name}; }
+  const day=p.day&&p.day.length>=8 ? `${p.day.slice(0,4)}-${p.day.slice(4,6)}-${p.day.slice(6,8)}` : "—";
+  const html=`
+    <div class="cf-type">${p.type}${(p.major===true||p.major==="true")?'<span class="cf-badge">major</span>':''}</div>
+    <div class="cf-place">${p.place||"Unknown location"}</div>
+    <div class="cf-grid">
+      <span class="k">Severity</span><span class="v">${Math.round(p.severity*100)}%</span>
+      <span class="k">Media coverage</span><span class="v">${p.articles} article${p.articles==1?"":"s"}</span>
+      <span class="k">Goldstein</span><span class="v">${p.goldstein}</span>
+      <span class="k">Date</span><span class="v">${day}</span>
+      <span class="k">Nearest region</span><span class="v">${best?`${best.name} · ${Math.round(best.km)} km`:"—"}</span>
+    </div>
+    ${p.url?`<a class="cf-link" href="${p.url}" target="_blank" rel="noopener"><i class="ph ph-arrow-square-out"></i> Source article</a>`:""}`;
+  new maplibregl.Popup({offset:10,maxWidth:"280px"}).setLngLat(lngLat).setHTML(html).addTo(map);
+}
+
+function renderRiskPanel(d){
+  const list=document.getElementById("dc-list");
+  if(!d || !d.datacenters || !d.datacenters.length){
+    list.innerHTML=`<div class="meta" style="color:var(--muted);padding:4px 2px">No region risk data available.</div>`;
+    return;
+  }
+  const R=numfmt(d.radius_km);
+  list.innerHTML=d.datacenters.map(dc=>{
+    const nm=dc.nearest_major;
+    const lines=[];
+    if(nm){
+      lines.push(`<b>${numfmt(nm.km)} km</b> to nearest major conflict`);
+      lines.push(`${nm.type} in ${nm.place} · ${nm.articles} articles`);
+    }else if(dc.within>0){
+      lines.push(`No <b>major</b> conflict within ${R} km`);
+      lines.push(`Lower-level local events only`);
+    }else{
+      lines.push(`No conflict within ${R} km`);
+    }
+    if(dc.within>0)
+      lines.push(`<span style="opacity:.7">${dc.major} major of ${numfmt(dc.within)} events within ${R} km</span>`);
+    return `<div class="dc" data-region="${dc.name}">
+      <span class="dot dot-${dc.level}"></span>
+      <div style="min-width:0">
+        <div class="nm">${dc.name}</div>
+        <div class="meta">${lines.join("<br>")}</div>
+      </div>
+      <span class="lvl lvl-${dc.level}">${LVL_LABEL[dc.level]||dc.level}</span>
+    </div>`;
+  }).join("");
+}
+
+async function loadConflicts(attempt=0){
+  if(!cf.ready) return;
+  cfStatus(attempt ? "Retrying conflict data…" : "Loading conflict data…", false);
+  try{
+    const r=await fetch(`/api/conflicts?hours=${cf.hours}&radius_km=${cf.radius}`);
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const d=await r.json();
+    if(d.ok===false || d.error) throw new Error(d.error||"unavailable");
+    cf.data=d;
+    map.getSource("conflicts").setData(d.conflicts);
+    map.getSource("risk-rings").setData(buildRings(d.datacenters, d.radius_km));
+    renderRiskPanel(d);
+    applyConflictScope();   // sets the major/all filter + the status line
+  }catch(err){
+    // first GDELT pull is uncached (~1-2s); a cold-start race can drop the request.
+    // Retry once before giving up so a transient hiccup doesn't blank the overlay.
+    if(attempt < 1){ setTimeout(()=>loadConflicts(attempt+1), 1800); return; }
+    cfStatus("GDELT unavailable — overlay paused ("+(err.message||"error")+")", true);
+    renderRiskPanel(null);
+  }
+}
+
+function applyConflictVisibility(){
+  if(!cf.ready) return;
+  const v=cf.on?"visible":"none";
+  CF_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setLayoutProperty(id,"visibility",v); });
+}
+
+// how many points are actually drawn given the current Major/All scope
+function shownCount(){
+  if(!cf.data) return 0;
+  const fs=cf.data.conflicts.features;
+  return cf.majorOnly ? fs.filter(f=>f.properties.major===true||f.properties.major==="true").length : fs.length;
+}
+function updateCfStatus(){
+  const d=cf.data; if(!d) return;
+  const when=fmtSlot(d.latest_slot);
+  cfStatus(`${numfmt(d.total_conflicts||0)} conflict events · last ${cf.hours} h · `
+    + `${shownCount()} ${cf.majorOnly?"major":"plotted"} shown`
+    + (when?` · to ${when} UTC`:"") + (d.cached?" · cached":""), false);
+}
+function applyConflictScope(){
+  if(!cf.ready) return;
+  if(map.getLayer("conflict-points"))
+    map.setFilter("conflict-points", cf.majorOnly ? ["==",["get","major"],true] : null);
+  updateCfStatus();
+}
+
+// ---- controls ----
+document.getElementById("cf-toggle").onclick=function(){
+  cf.on=!cf.on; this.classList.toggle("active",cf.on); this.textContent=cf.on?"On":"Off";
+  applyConflictVisibility();
+};
+document.querySelectorAll("#cf-scope .s").forEach(s=>{
+  s.onclick=()=>{
+    document.querySelectorAll("#cf-scope .s").forEach(x=>x.classList.remove("on"));
+    s.classList.add("on"); cf.majorOnly = s.dataset.major==="1"; applyConflictScope();
+  };
+});
+document.querySelectorAll("#cf-window .s").forEach(s=>{
+  s.onclick=()=>{
+    document.querySelectorAll("#cf-window .s").forEach(x=>x.classList.remove("on"));
+    s.classList.add("on"); cf.hours=+s.dataset.h; loadConflicts();
+  };
+});
+const cfRadius=document.getElementById("cf-radius"), cfRadiusVal=document.getElementById("cf-radius-val");
+cfRadius.addEventListener("input",()=>{ cfRadiusVal.textContent=`${numfmt(+cfRadius.value)} km`; });
+cfRadius.addEventListener("change",()=>{ cf.radius=+cfRadius.value; loadConflicts(); });
+
+// ---- boot: add layers once the map style is ready, then fetch ----
+function initConflicts(){ addConflictLayers(); applyConflictVisibility(); loadConflicts(); }
+if(map.isStyleLoaded()) initConflicts(); else map.on("load", initConflicts);
+</script>
+
+<!-- ===================== Region → customers → AI email ===================== -->
+<script>
+(function(){
+  "use strict";
+  const card = document.getElementById('geo-card');
+  const modal = document.getElementById('geo-modal');
+  const fmt = n => n>=1e6 ? (n/1e6).toFixed(2)+'M' : n>=1e3 ? (n/1e3).toFixed(0)+'K' : ''+n;
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+  let CUSTOMERS = null, curGeo = null, curCust = null;
+
+  async function api(p, o){
+    const r = await fetch(p, o);
+    if(!r.ok) throw new Error((await r.text()).slice(0,200) || ('HTTP '+r.status));
+    return r.json();
+  }
+  async function ensureCustomers(){
+    if(CUSTOMERS) return true;
+    try { CUSTOMERS = (await api('/api/customers')).customers || []; return true; }
+    catch(e){ return false; }                  // no backend (static file) -> map-only
+  }
+
+  function close(){ modal.classList.remove('open'); }
+  modal.addEventListener('click', e => { if(e.target === modal) close(); });
+  document.addEventListener('keydown', e => { if(e.key === 'Escape') close(); });
+
+  function geoKey(name){ for(const k in DATA.geos) if(DATA.geos[k].name === name) return k; return null; }
+  function custsInGeo(key){
+    return CUSTOMERS
+      .map(c => { const res = c.resources.filter(r => r.geo === key);
+                  return {c, res, spend: res.reduce((s,r)=>s+r.monthly_spend,0)}; })
+      .filter(x => x.res.length).sort((a,b)=>b.spend-a.spend);
+  }
+
+  async function openRegion(name){
+    const key = geoKey(name); if(!key) return;
+    const g = DATA.geos[key];
+    if(!g.synthetic && typeof map !== 'undefined'){    // fly the map to the region
+      map.flyTo({center:[g.lon, g.lat], zoom: Math.max(map.getZoom(), 3.8), essential:true, duration:1200});
+    }
+    curGeo = {key, name, g};
+    modal.classList.add('open');
+    if(!(await ensureCustomers())){
+      card.innerHTML = `<button class="gm-x">&times;</button><h3 class="gm-h">${esc(name)}</h3>
+        <p class="gm-sub">Map centred on ${esc(g.place)}. Customer data needs the backend (server.py) running.</p>`;
+      card.querySelector('.gm-x').onclick = close; return;
+    }
+    renderRegionList();
+  }
+
+  function renderRegionList(){
+    const {key, name} = curGeo;
+    const list = custsInGeo(key);
+    card.innerHTML = `<button class="gm-x">&times;</button>
+      <h3 class="gm-h">Customers in ${esc(name)}</h3>
+      <p class="gm-sub">${list.length
+        ? list.length+' customer'+(list.length>1?'s':'')+' run resources here · click one to draft outreach'
+        : 'No customers have resources in this region.'}</p>
+      <div id="gm-list"></div>`;
+    document.getElementById('gm-list').innerHTML = list.map(({c,spend}) => `
+      <div class="gm-row" data-id="${c.id}">
+        <div><div class="gm-name">${esc(c.company)}</div>
+          <div class="gm-meta">${esc(c.current_cloud_label)} <b>→ ${esc(c.target_cloud_label)}</b> · ${fmt(spend)} u here</div></div>
+        <div class="gm-badge">−${c.discount_pct}%</div>
+      </div>`).join('');
+    card.querySelector('.gm-x').onclick = close;
+    card.querySelectorAll('.gm-row').forEach(el => el.onclick = () => openCust(el.dataset.id));
+  }
+
+  function openCust(id){
+    const c = CUSTOMERS.find(x => x.id === id); if(!c) return;
+    curCust = c;
+    const res = c.resources.filter(r => r.geo === curGeo.key);
+    const spendHere = res.reduce((s,r)=>s+r.monthly_spend,0);
+    card.innerHTML = `<button class="gm-x">&times;</button>
+      <button class="gm-back"><i class="ph ph-arrow-left"></i> ${esc(curGeo.name)}</button>
+      <h3 class="gm-h">${esc(c.company)}</h3>
+      <p class="gm-sub">${esc(c.contact)} · ${esc(c.industry)} · ${esc(c.email)}</p>
+      <div class="gm-stats">
+        <div class="gm-stat"><div class="k">Migration</div><div class="v">${esc(c.current_cloud_label)} → ${esc(c.target_cloud_label)}</div></div>
+        <div class="gm-stat"><div class="k">Discount</div><div class="v" style="color:#d98b6b">${c.discount_pct}%</div></div>
+        <div class="gm-stat"><div class="k">Spend in ${esc(curGeo.name)}</div><div class="v">${fmt(spendHere)} u</div></div>
+        <div class="gm-stat"><div class="k">Total resources</div><div class="v">${c.resource_count}</div></div>
+      </div>
+      <div class="gm-res">${res.map(r => `<div class="gm-rr">
+        <span>${r.units}× ${esc(r.service_label)}</span><span>${esc(r.geo_label)}</span>
+        <span class="sp">${fmt(r.monthly_spend)}</span></div>`).join('')}</div>
+      <button class="gm-btn primary" id="gm-draft"><i class="ph ph-sparkle"></i> Draft email with AI</button>
+      <div class="gm-eb" id="gm-eb" style="display:none">
+        <label>Subject</label><input id="gm-subj" type="text">
+        <label>Body</label><textarea id="gm-body"></textarea>
+        <div class="gm-note" id="gm-model"></div>
+        <div class="gm-actions"><button class="gm-btn send" id="gm-send">Send</button>
+          <span class="gm-status" id="gm-st"></span></div>
+      </div>`;
+    card.querySelector('.gm-x').onclick = close;
+    card.querySelector('.gm-back').onclick = renderRegionList;
+    document.getElementById('gm-draft').onclick = draft;
+    document.getElementById('gm-send').onclick = send;
+  }
+
+  async function draft(){
+    const btn = document.getElementById('gm-draft');
+    btn.disabled = true; btn.innerHTML = '<span class="gm-spin"></span>Drafting…';
+    try {
+      const d = await api('/api/draft', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({customer_id: curCust.id})});
+      document.getElementById('gm-subj').value = d.subject || '';
+      document.getElementById('gm-body').value = d.body || '';
+      document.getElementById('gm-model').textContent = 'Drafted by ' + (d.model || 'template') + ' · edit before sending';
+      document.getElementById('gm-eb').style.display = 'block';
+      btn.innerHTML = '<i class="ph ph-sparkle"></i> Re-draft';
+    } catch(e){
+      document.getElementById('gm-eb').style.display = 'block';
+      const st = document.getElementById('gm-st'); st.className = 'gm-status err'; st.textContent = 'Draft failed: ' + e.message;
+    } finally { btn.disabled = false; }
+  }
+
+  async function send(){
+    const btn = document.getElementById('gm-send'), st = document.getElementById('gm-st');
+    btn.disabled = true; st.className = 'gm-status'; st.innerHTML = '<span class="gm-spin"></span>Sending…';
+    try {
+      const r = await api('/api/send', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({customer_id: curCust.id,
+          subject: document.getElementById('gm-subj').value, body: document.getElementById('gm-body').value})});
+      if(r.status === 'sent'){
+        st.className = 'gm-status ok'; st.innerHTML = '<i class="ph ph-check"></i> Sent to ' + esc(r.to) + (r.id ? ' (id '+esc(r.id)+')' : '');
+      } else {
+        st.className = 'gm-status warn'; st.textContent = 'Dry-run — would send to ' + r.to + '. ' + (r.detail||'');
+      }
+    } catch(e){
+      st.className = 'gm-status err'; st.textContent = 'Send failed: ' + e.message;
+    } finally { btn.disabled = false; }
+  }
+
+  // Delegated click on the region cards (they re-render on every conflict refresh).
+  document.getElementById('dc-list').addEventListener('click', e => {
+    const el = e.target.closest('.dc'); if(!el) return;
+    const name = el.dataset.region || (el.querySelector('.nm') && el.querySelector('.nm').textContent);
+    if(name) openRegion(name);
+  });
+})();
+</script>
+
+</body>
+</html>
