@@ -38,10 +38,9 @@
   .rng{-webkit-appearance:none;appearance:none;width:100%;height:5px;border-radius:999px;
     background:linear-gradient(90deg,var(--teal),var(--pink));outline:none;cursor:pointer}
   .rng::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:15px;height:15px;
-    border-radius:50%;background:#f4f3f0;border:2px solid var(--pink);cursor:pointer;
-    box-shadow:0 0 10px rgba(200,127,89,.6)}
+    border-radius:50%;background:#f4f3f0;border:2px solid var(--pink);cursor:pointer}
   .rng::-moz-range-thumb{width:15px;height:15px;border-radius:50%;background:#f4f3f0;
-    border:2px solid var(--pink);cursor:pointer;box-shadow:0 0 10px rgba(200,127,89,.6)}
+    border:2px solid var(--pink);cursor:pointer}
   .presets{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
   .preset{font:600 11px/1 var(--font);color:var(--dim);background:transparent;
     border:1px solid var(--line);border-radius:999px;padding:5px 9px;cursor:pointer;
@@ -662,17 +661,59 @@
       hovered.material.emissive.copy(hovered.userData.baseEmissive);
       hovered = null;
     }
-    if(beam){ beam.geometry.dispose(); beam.material.dispose(); scene.remove(beam); beam=null; }
+    if(beam){
+      beam.traverse(o => { if(o.geometry) o.geometry.dispose(); if(o.material) o.material.dispose(); });
+      scene.remove(beam); beam=null;
+    }
   }
   function makeBeam(from, to){
+    const dist = from.distanceTo(to);
     const mid = from.clone().lerp(to, 0.5);
-    mid.y += from.distanceTo(to)*0.42 + 8;
+    mid.y += Math.max(dist*0.42, 11) + 8;                  // graceful arc even when short
     const curve = new THREE.QuadraticBezierCurve3(from, mid, to);
-    const m = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, 46, 0.55, 8, false),
-      new THREE.MeshBasicMaterial({color:0xd4905f, transparent:true, opacity:0.75,
+
+    const CORE = 0xc9c2ff, GLOW = 0x7367f0;                // bright lavender core, purple glow
+    const g = new THREE.Group();
+
+    // soft outer glow tube
+    const glow = new THREE.Mesh(
+      new THREE.TubeGeometry(curve, 64, 1.5, 12, false),
+      new THREE.MeshBasicMaterial({color:GLOW, transparent:true, opacity:0.16,
         blending:THREE.AdditiveBlending, depthWrite:false}));
-    return m;
+    g.add(glow);
+
+    // crisp core tube
+    const core = new THREE.Mesh(
+      new THREE.TubeGeometry(curve, 64, 0.5, 12, false),
+      new THREE.MeshBasicMaterial({color:CORE, transparent:true, opacity:0.95, depthWrite:false}));
+    g.add(core);
+
+    // arrowhead at the target, aligned to the curve's final tangent (points into the district)
+    const tip = curve.getPoint(1);
+    const tan = curve.getTangent(1).normalize();
+    const head = new THREE.Mesh(
+      new THREE.ConeGeometry(2.4, 6.5, 20),
+      new THREE.MeshBasicMaterial({color:CORE, transparent:true, opacity:0.98, depthWrite:false}));
+    head.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), tan);
+    head.position.copy(tip).addScaledVector(tan, -3.25);   // shift base back so the apex sits on target
+    g.add(head);
+
+    // origin node on the building being moved
+    const node = new THREE.Mesh(
+      new THREE.SphereGeometry(0.85, 14, 14),
+      new THREE.MeshBasicMaterial({color:CORE, transparent:true, opacity:0.9, depthWrite:false}));
+    node.position.copy(from);
+    g.add(node);
+
+    // travelling pulse — conveys direction of flow toward the target
+    const pulse = new THREE.Mesh(
+      new THREE.SphereGeometry(1.1, 14, 14),
+      new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:0.9,
+        blending:THREE.AdditiveBlending, depthWrite:false}));
+    g.add(pulse);
+
+    g.userData = {glow, pulse, curve};
+    return g;
   }
   function setHover(mesh, clientX, clientY){
     hovered = mesh;
@@ -796,7 +837,15 @@
     const now = (t||0)*0.001;
     if(autoRotate) cam.az += 0.0024;
     updateCamera();
-    if(beam) beam.material.opacity = 0.5 + 0.3*Math.sin(now*4);
+    if(beam){
+      const u = beam.userData;
+      if(u.glow) u.glow.material.opacity = 0.12 + 0.10*Math.sin(now*4);
+      if(u.pulse && u.curve){
+        const ft = (now*0.5) % 1;                          // pulse travels from origin to target
+        u.pulse.position.copy(u.curve.getPoint(ft));
+        u.pulse.material.opacity = 0.25 + 0.6*Math.sin(ft*Math.PI);
+      }
+    }
     projectLabels();
     renderer.render(scene, camera);
   }
@@ -1067,8 +1116,9 @@
   $('cell-close').onclick = closeCell;
   $('cell-modal').onclick = e => { if(e.target.id==='cell-modal') closeCell(); };
   document.addEventListener('keydown', e => { if(e.key==='Escape') closeCell(); });
-  // Customers now surface in the hover tooltip (see __costcityCellCustomers),
-  // so a building click no longer opens the cell modal.
+  // The hover tooltip (see __costcityCellCustomers) previews customers; clicking a
+  // building opens this modal so the rows are pressable -> drill into a customer.
+  window.addEventListener('costcity:cellclick', e => openCell(e.detail));
 
   boot();
 })();

@@ -28,11 +28,10 @@
   .top .sub .live{color:var(--mint);font-weight:600}
   .top .sub .dry{color:var(--amber);font-weight:600}
 
-  .agg{display:flex;gap:26px;margin:13px 0 4px;flex-wrap:wrap}
-  .agg .k{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.6px}
-  .agg .v{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:1px}
-  .agg .v.pink{color:var(--pink-bright)}
-  .agg .v.teal{color:var(--teal)}
+  .summary{margin:11px 0 2px;font-size:12.5px;color:var(--dim);font-variant-numeric:tabular-nums}
+  .summary b{color:var(--ink);font-weight:650}
+  .summary .em{color:var(--pink-bright);font-weight:700}
+  .summary .dot{margin:0 8px;opacity:.4}
 
   .controls{display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap}
   .search{flex:1 1 240px;max-width:360px;position:relative}
@@ -44,35 +43,51 @@
   .sortsel select{background:#131419;border:1px solid var(--line);border-radius:9px;color:var(--ink);
     font:inherit;font-size:12.5px;padding:8px 10px;cursor:pointer;outline:none}
 
-  /* ---- grid of customer cards ---- */
-  .grid{flex:1 1 auto;overflow-y:auto;padding:18px 22px 28px;
-    display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px;align-content:start}
-  .ccard{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:15px 16px;
-    cursor:pointer;transition:transform .14s ease,border-color .14s ease,box-shadow .14s ease;
-    display:flex;flex-direction:column;gap:10px}
-  .ccard:hover{transform:translateY(-3px);border-color:rgba(123,167,143,.35);
-    box-shadow:0 12px 34px rgba(0,0,0,.4)}
-  .ccard .chead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
-  .ccard .co{font-size:15px;font-weight:650;line-height:1.25}
-  .ccard .ind{font-size:11.5px;color:var(--dim);margin-top:2px}
-  .badge{flex:0 0 auto;font-size:12px;font-weight:700;color:#201912;background:var(--pink);
-    border-radius:999px;padding:4px 9px;white-space:nowrap;box-shadow:0 0 12px rgba(200,127,89,.35)}
-  .badge.flat{background:rgba(255,255,255,.08);color:var(--dim);box-shadow:none}
-  .route{font-size:12.5px;color:var(--ink);display:flex;align-items:center;gap:6px}
-  .route b{color:var(--pink-bright);font-weight:600}
-  .route .arrow{color:var(--dim)}
-  .mini{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;border-top:1px solid var(--line);
-    padding-top:10px}
-  .mini .k{font-size:9.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
-  .mini .v{font-size:13.5px;font-weight:650;margin-top:1px;font-variant-numeric:tabular-nums}
-  .mini .v.teal{color:var(--teal)} .mini .v.pink{color:var(--pink-bright)}
-  .ccard .contact{font-size:11.5px;color:var(--dim);display:flex;align-items:center;gap:6px}
-  .chips{display:flex;flex-wrap:wrap;gap:5px}
+  /* ---- migration ledger (ranked by opportunity) ---- */
+  .grid{flex:1 1 auto;overflow:auto;padding:6px 22px 26px}
+  .ledger{--cols:32px minmax(230px,1.5fr) minmax(140px,.9fr) minmax(170px,1.2fr) 104px minmax(210px,1.15fr) 60px;
+    min-width:980px}
+  .lhead,.lrow{display:grid;grid-template-columns:var(--cols);align-items:center;gap:16px}
+  .lhead{position:sticky;top:0;z-index:2;background:var(--bg);padding:10px 12px 9px;
+    font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);
+    border-bottom:1px solid var(--line)}
+  .lhead .r{text-align:right}
+  .lrow{padding:11px 12px;border-radius:10px;cursor:pointer;transition:background .12s}
+  .lrow:hover{background:rgba(255,255,255,.045)}
+  .lrow.calm{opacity:.58} .lrow.calm:hover{opacity:.85}
+
+  .rk{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums;text-align:right}
+  .cust .co{font-size:14px;font-weight:650;line-height:1.2}
+  .cust .meta{font-size:11px;color:var(--dim);margin-top:2px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  .route{font-size:12.5px;color:var(--ink);display:flex;align-items:center;gap:7px;white-space:nowrap}
+  .route b{color:var(--pink-bright);font-weight:650}
+  .route .arr{color:var(--dim)}
+  .route.calm{color:var(--mint);font-size:12px}
+  .route.calm i{margin-right:4px}
+
+  .foot{display:flex;flex-wrap:wrap;gap:5px}
   .chip{font-size:10.5px;color:var(--dim);background:rgba(255,255,255,.05);border:1px solid var(--line);
-    border-radius:999px;padding:3px 8px;cursor:pointer;transition:all .12s;white-space:nowrap}
-  .chip:hover{color:#14151a;background:var(--accent);border-color:var(--accent);
-    box-shadow:0 0 10px rgba(123,167,143,.4)}
+    border-radius:7px;padding:3px 7px;cursor:pointer;transition:all .12s;white-space:nowrap}
+  .chip:hover{color:#14151a;background:var(--accent);border-color:var(--accent)}
   .chip:active{transform:scale(.94)}
+  .chip.more{cursor:default;background:none;border-color:transparent;color:var(--dim)}
+
+  .spend{text-align:right;font-size:13px;color:var(--ink);font-variant-numeric:tabular-nums}
+  .spend .u{color:var(--dim)}
+  .res{text-align:right;font-size:13px;color:var(--dim);font-variant-numeric:tabular-nums}
+
+  .opp{display:flex;flex-direction:column;gap:5px}
+  .opp .top{display:flex;align-items:baseline;justify-content:flex-end;gap:8px}
+  .opp .av{font-size:14px;font-weight:700;color:var(--pink-bright);font-variant-numeric:tabular-nums}
+  .opp .av .u{font-weight:400;color:var(--dim)}
+  .opp .pct{font-size:10.5px;font-weight:700;color:#201912;background:var(--pink);
+    border-radius:6px;padding:2px 6px}
+  .opp .bar{width:100%;height:5px;border-radius:3px;background:rgba(255,255,255,.07);overflow:hidden}
+  .opp .bar>i{display:block;height:100%;border-radius:3px;
+    background:linear-gradient(90deg,var(--pink),var(--amber))}
+  .opp.none{align-items:flex-end;color:var(--dim);font-size:13px}
 
   /* ---- empty / loading state ---- */
   .empty{grid-column:1/-1;text-align:center;color:var(--dim);padding:60px 20px;font-size:13.5px;
@@ -143,14 +158,14 @@
   <div class="top">
     <h1><i class="ph ph-users-three"></i> Customers</h1>
     <div class="sub" id="sub">Loading roster…</div>
-    <div class="agg" id="agg"></div>
+    <div class="summary" id="agg"></div>
     <div class="controls">
       <div class="search"><i class="ph ph-magnifying-glass"></i>
         <input id="q" type="text" placeholder="Search company, contact, industry…" /></div>
       <div class="sortsel"><span>Sort</span>
         <select id="sort">
+          <option value="avoidable">Avoidable opportunity</option>
           <option value="spend">Monthly spend</option>
-          <option value="avoidable">Avoidable spend</option>
           <option value="discount">Discount offer</option>
           <option value="company">Company A–Z</option>
         </select>
@@ -205,7 +220,7 @@
   const esc = s => String(s).replace(/[&<>"]/g, c =>
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-  let CFG = null, CUSTOMERS = [], current = null;
+  let CFG = null, CUSTOMERS = [], current = null, MAX_AVOID = 1;
 
   // ---------- footprint mini-map: show a customer's regions on hover ----------
   const MM_KEY = "i8lJsOawA4GXGnYwJmLL";          // same MapTiler key as the Map view
@@ -323,6 +338,7 @@
     const list = await loadCustomers();
     if(list === null){ showOffline(); return; }
     CUSTOMERS = list;
+    MAX_AVOID = Math.max(1, ...CUSTOMERS.map(c => c.avoidable_spend || 0));  // savings-bar scale
     renderHeader();
     applyFilters();
     initMiniMap();
@@ -343,10 +359,9 @@
       : `${n} synthetic accounts · read-only · start <code>server.py</code> to draft and send email`;
     const uHint = 'Relative units (synthetic list-price-weighted spend), not USD';
     $('agg').innerHTML =
-      `<div><div class="k">Customers</div><div class="v">${n}</div></div>
-       <div><div class="k">Monthly spend</div><div class="v teal" title="${uHint}">${fmt(totSpend)} u</div></div>
-       <div><div class="k">Avoidable spend</div><div class="v pink" title="${uHint}">${fmt(totAvoid)} u</div></div>
-       <div><div class="k">Worth migrating</div><div class="v">${movable} / ${n}</div></div>`;
+      `<span class="em" title="${uHint}">${fmt(totAvoid)} u</span> avoidable`
+      + `<span class="dot">·</span><b>${movable}</b> of <b>${n}</b> accounts worth migrating`
+      + `<span class="dot">·</span><b title="${uHint}">${fmt(totSpend)} u</b> total monthly spend`;
   }
 
   function applyFilters(){
@@ -366,32 +381,45 @@
 
   function renderGrid(list){
     if(!list.length){ $('grid').innerHTML = '<div class="empty">No customers match your search.</div>'; return; }
-    $('grid').innerHTML = list.map(c => {
-      const moves = c.avoidable_spend>0;
-      return `<div class="ccard" data-id="${esc(c.id)}">
-        <div class="chead">
-          <div><div class="co">${esc(c.company)}</div><div class="ind">${esc(c.industry)}</div></div>
-          <div class="badge${moves?'':' flat'}">${moves?('−'+c.discount_pct+'%'):'on cheapest'}</div>
-        </div>
-        <div class="route">${esc(c.current_cloud_label)}
-          <span class="arrow">→</span> <b>${esc(c.target_cloud_label)}</b></div>
-        <div class="chips">${customerGeos(c).map(([g,v]) =>
-          `<span class="chip" data-geo="${g}" title="${GEO[g].name} · ${fmt(v)} u">${GEO[g].name}</span>`).join('')}</div>
-        <div class="mini">
-          <div><div class="k">Spend</div><div class="v teal">${fmt(c.monthly_spend)} u</div></div>
-          <div><div class="k">Avoidable</div><div class="v pink">${fmt(c.avoidable_spend)} u</div></div>
-          <div><div class="k">Resources</div><div class="v">${c.resource_count}</div></div>
-        </div>
-        <div class="contact"><i class="ph ph-user"></i> ${esc(c.contact)} · ${esc(c.email)}</div>
+    const head = `<div class="lhead">
+        <div class="r">#</div><div>Customer</div><div>Migration</div><div>Footprint</div>
+        <div class="r">Monthly</div><div class="r">Avoidable opportunity</div><div class="r">Res.</div>
+      </div>`;
+    const rows = list.map((c, i) => {
+      const moves = c.avoidable_spend > 0;
+      const geos = customerGeos(c), shown = geos.slice(0, 4), extra = geos.length - shown.length;
+      const chips = shown.map(([g,v]) =>
+          `<span class="chip" data-geo="${g}" title="${GEO[g].name} · ${fmt(v)} u">${GEO[g].name}</span>`).join('')
+        + (extra > 0 ? `<span class="chip more">+${extra}</span>` : '');
+      const route = moves
+        ? `<div class="route">${esc(c.current_cloud_label)} <span class="arr">→</span> <b>${esc(c.target_cloud_label)}</b></div>`
+        : `<div class="route calm"><i class="ph ph-check-circle"></i>On cheapest</div>`;
+      const barW = moves ? Math.max(4, Math.round(c.avoidable_spend / MAX_AVOID * 100)) : 0;
+      const opp = moves
+        ? `<div class="opp"><div class="top">
+             <span class="av">${fmt(c.avoidable_spend)}<span class="u"> u</span></span>
+             <span class="pct">−${c.discount_pct}%</span></div>
+             <div class="bar"><i style="width:${barW}%"></i></div></div>`
+        : `<div class="opp none">—</div>`;
+      return `<div class="lrow${moves?'':' calm'}" data-id="${esc(c.id)}">
+        <div class="rk">${i + 1}</div>
+        <div class="cust"><div class="co">${esc(c.company)}</div>
+          <div class="meta">${esc(c.industry)} · ${esc(c.contact)}</div></div>
+        ${route}
+        <div class="foot">${chips}</div>
+        <div class="spend">${fmt(c.monthly_spend)}<span class="u"> u</span></div>
+        ${opp}
+        <div class="res">${c.resource_count}</div>
       </div>`;
     }).join('');
-    $('grid').querySelectorAll('.ccard').forEach(el => {
+    $('grid').innerHTML = `<div class="ledger">${head}${rows}</div>`;
+    $('grid').querySelectorAll('.lrow').forEach(el => {
       const id = el.dataset.id;
       el.onclick = () => openCustomer(id);
       el.addEventListener('mouseenter', () => hoverCard(id));
-      el.querySelectorAll('.chip').forEach(ch => {
+      el.querySelectorAll('.chip[data-geo]').forEach(ch => {
         ch.addEventListener('click', e => {
-          e.stopPropagation();                       // map the region, don't open the popup
+          e.stopPropagation();                       // map the region, don't open the modal
           focusRegion(CUSTOMERS.find(x => x.id === id), ch.dataset.geo);
         });
       });

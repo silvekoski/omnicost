@@ -3,11 +3,11 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/python-3.11%2B-7367f0?style=flat-square" alt="Python 3.11+">
-  <img src="https://img.shields.io/badge/FastAPI-backend-7367f0?style=flat-square" alt="FastAPI">
-  <img src="https://img.shields.io/badge/MapLibre%20GL-3D%20map-00bad1?style=flat-square" alt="MapLibre GL">
-  <img src="https://img.shields.io/badge/three.js-grid%20city-00bad1?style=flat-square" alt="three.js">
-  <img src="https://img.shields.io/badge/GDELT%202.0-conflict%20feed-eb3d63?style=flat-square" alt="GDELT 2.0">
+  <img src="https://img.shields.io/badge/python-3.11%2B-5e8d77?style=flat-square" alt="Python 3.11+">
+  <img src="https://img.shields.io/badge/FastAPI-backend-5e8d77?style=flat-square" alt="FastAPI">
+  <img src="https://img.shields.io/badge/MapLibre%20GL-3D%20map-7ba78f?style=flat-square" alt="MapLibre GL">
+  <img src="https://img.shields.io/badge/three.js-grid%20city-7ba78f?style=flat-square" alt="three.js">
+  <img src="https://img.shields.io/badge/GDELT%202.0-conflict%20feed-c87f59?style=flat-square" alt="GDELT 2.0">
 </p>
 
 **Omnicost** turns cloud usage into a cost-to-serve story across providers, regions, and time. It shows where spend lands, what it would cost on a cheaper cloud, which customers sit on the expensive footprint, and how close live geopolitical conflict is to each datacenter region.
